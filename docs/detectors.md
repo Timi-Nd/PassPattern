@@ -1,139 +1,209 @@
-# Detectors
+# Detector guide
 
-PassPattern detects recognizable patterns; it does not estimate password strength.
-All detectors are opt-in. The structural and contextual factory functions return
-fresh instances. Dictionary detectors require an application-supplied lexicon.
+A detector looks for a particular kind of structure and returns a span plus
+explanatory metadata. It does not decide whether a password is strong. You select
+detectors explicitly; `PassPatternEngine()` with no arguments runs none.
 
-## Structural
+The factory functions return fresh detector instances:
 
-| Class | ID / type | Defaults and rule | Limitations and likely false positives |
-|---|---|---|---|
-| `RepeatedCharacterDetector` | `structural.repeated_character` / `repeated_character` | `min_repetitions=3`; finds maximal consecutive identical Unicode code points. | Repeated punctuation or intentional text can match. |
-| `RepeatedSubstringDetector` | `structural.repeated_substring` / `repeated_substring` | `min_unit_length=2`, `min_repetitions=2`; emits tandem repeats of primitive units. | Periodic identifiers and deliberate repetition can match. Meaningful overlapping spans are retained. |
-| `NumericSequenceDetector` | `structural.numeric_sequence` / `numeric_sequence`, `arithmetic_progression`, `consecutive_prime_sequence` (experimental types: `geometric_progression`, `fibonacci_like_progression`) | `min_sequence_length=3` for maximal ASCII ±1 runs; also recognizes arithmetic progressions and consecutive-prime runs with at least four terms. | Non-ASCII digits are excluded. Numeric-looking substrings can be coincidental; run, term, candidate, and work limits apply. |
-| `AlphabeticSequenceDetector` | `structural.alphabetic_sequence` / `alphabetic_sequence` | `min_sequence_length=3`; maximal ASCII letters with constant case-insensitive step +1 or -1. | Does not wrap (z→a); keyboard adjacency is not used. |
+- `default_structural_detectors()` returns repeated-character, repeated-substring,
+  numeric-sequence, and alphabetic-sequence detectors.
+- `default_contextual_detectors()` returns date, year, and keyboard-walk detectors.
+- Dictionary detectors require a `DictionaryLexicon` that you supply.
 
-Structural minimum/repetition thresholds reject booleans and values below their
-documented minima.
-`default_structural_detectors()` constructs all four using these defaults.
+## Structural patterns
 
-`NumericSequenceDetector` accepts `min_sequence_length=3` for the compatible
-unit-step detector and these bounded interpretation options:
+| Detector | Pattern type | Default rule |
+|---|---|---|
+| `RepeatedCharacterDetector` | `repeated_character` | Maximal runs of the same code point, at least 3. |
+| `RepeatedSubstringDetector` | `repeated_substring` | Repeated primitive units; default unit length at least 2 and at least 2 repetitions. |
+| `NumericSequenceDetector` | `numeric_sequence`, `arithmetic_progression`, `consecutive_prime_sequence` | ASCII digit sequences; numeric-family details below. |
+| `AlphabeticSequenceDetector` | `alphabetic_sequence` | Maximal ASCII letter runs with a case-insensitive step of +1 or -1, at least 3 letters. |
+
+Repeated patterns can occur in ordinary text and identifiers. Alphabetic sequences
+do not wrap from `z` to `a`; they are not keyboard-walk detection.
+
+## Numeric sequences
+
+The numeric detector keeps the original digit-by-digit sequence behavior and adds
+mathematical families. It looks only at contiguous ASCII digit runs. It considers
+candidate terms and checks relationships using integer arithmetic, so multi-digit
+terms can be recognized without floating-point comparisons.
+
+### Supported by default
+
+**Consecutive digits (`numeric_sequence`).** A maximal run of digits that changes by
+exactly `+1` or `-1`, with at least `min_sequence_length=3` digits. For example,
+`1234` is ascending and `9876` descending. It does not wrap at 9 and 0.
+
+**Arithmetic progression (`arithmetic_progression`).** At least four terms with the
+same nonzero integer difference. Differences of `+1` and `-1` remain in the legacy
+`numeric_sequence` family. Examples:
+
+| Input | Terms | Difference |
+|---|---|---:|
+| `2468` | 2, 4, 6, 8 | +2 |
+| `13579` | 1, 3, 5, 7, 9 | +2 |
+| `8642` | 8, 6, 4, 2 | -2 |
+| `97531` | 9, 7, 5, 3, 1 | -2 |
+| `10121416` | 10, 12, 14, 16 | +2 |
+| `20304050` | 20, 30, 40, 50 | +10 |
+
+The last two examples show why the detector considers bounded multi-digit
+segmentations as well as individual digits.
+
+**Consecutive primes (`consecutive_prime_sequence`).** At least four terms must be
+adjacent primes, not just numbers that happen to be prime. For example, `235711`
+is interpreted as 2, 3, 5, 7, 11; `11131719` as 11, 13, 17, 19. A prime run with
+fewer than four terms is not reported.
+
+### Experimental and off by default
+
+Set `experimental_families` to opt in:
 
 ```python
-NumericSequenceDetector(
-    max_digit_run=32,
-    max_term_digits=6,
-    max_term_value=999_999,
-    max_terms=8,
-    max_candidates=8192,
-    max_work=100_000,
-    experimental_families=frozenset(),
+from passpattern.structural import NumericSequenceDetector
+
+detector = NumericSequenceDetector(
+    experimental_families=frozenset(
+        {"geometric_progression", "fibonacci_like_progression"}
+    )
 )
 ```
 
-The limits may be lowered within their supported ranges; the maximums are fixed at
-32 ASCII digits per contiguous run, six digits and 999,999 per term, 16 terms, 32,768
-valid candidates, and 100,000 units of interpretation/primality work per detector
-invocation. Exceeding a limit raises the content-free `NumericSequenceLimitError`;
-the detector does not silently truncate. The engine's existing input and total-match
-limits remain in force.
+- **Geometric progression (`geometric_progression`):** at least four positive terms
+  with one exact rational ratio. `24816` is interpreted as 2, 4, 8, 16, with ratio
+  2/1.
+- **Fibonacci-like progression (`fibonacci_like_progression`):** at least six
+  non-negative terms, with a nondecreasing first pair, following
+  `t[n] = t[n - 1] + t[n - 2]`. `11235813` is interpreted as
+  1, 1, 2, 3, 5, 8, 13. The all-zero progression is not reported.
 
-Numeric interpretation first preserves the previous maximal single-digit +1/-1
-matches. Other families use bounded, contiguous terms: a multi-digit term is canonical
-decimal (no leading zero), while `0` is permitted as a single-digit term. Arithmetic
-progressions use exact integer differences; consecutive-prime matches require the
-terms to be adjacent in the prime sequence, not merely prime. Terminations and
-overlaps remain visible, including the legacy run inside a longer numeric string.
-Strings with multiple valid term-boundary interpretations are marked `ambiguous`;
-duplicate matches for the same family, span, and interpretation are coalesced. When
-one family and span have multiple segmentations, the reported terms use the greatest
-term count, then the earliest available boundaries; all distinct interpretations still
-contribute to the ambiguity flag.
+These families are experimental because short digit strings can fit mathematical
+rules by coincidence. Their thresholds reduce some accidental matches but cannot
+prove that a person intended a sequence.
 
-Experimental families are off by default. Pass
-`experimental_families=frozenset({"geometric_progression"})` to opt into exact
-integer geometric ratios (at least four positive terms), and/or
-`"fibonacci_like_progression"` to opt into the recurrence
-`t[n] = t[n - 1] + t[n - 2]` (at least six terms). The latter accepts non-negative
-terms with a nondecreasing first pair and rejects the all-zero recurrence; its reported
-direction is ascending. These thresholds reduce accidental matches but do not establish
-that a numeric substring was intentional or predictable to a human.
+### Segmentation, zeros, and overlaps
 
-Numeric matches are `NumericPatternMatch` values, a `PatternMatch` subtype. They carry
-each integer term and its half-open code-point span, direction, a reduced numerator /
-denominator for arithmetic or geometric relationships, and the ambiguity flag. Prime
-matches have no ratio or difference parameter. Term values reproduce numeric content
-from the input, so protect these results like other sensitive password-derived data.
-Future families should reuse the bounded term interpreter, state their recurrence and
-minimum term count, use exact integer arithmetic, and add tests, shared vectors, and
-benchmark cases before being enabled by default.
+A multi-digit term uses canonical decimal notation and cannot start with zero. A
+single `0` is valid. For example, `01020304` can be read as 0, 10, 20, 30.
 
-## Dictionary
+Some strings have more than one valid interpretation. For example, `12345678` can
+contain a legacy digit-by-digit run and the arithmetic progression 12, 34, 56, 78.
+Each reported match includes its own chosen terms. If multiple term boundaries fit
+the same span, `ambiguous` is true; the selected interpretation has the most terms,
+then the earliest boundaries. Distinct pattern families and valid overlapping spans
+are preserved rather than merged.
 
-All dictionary detectors use an explicit `DictionaryLexicon`. There is no included
-authoritative password list. Matching scans processed text and returns metadata, not
-the word, input substring, or source ID.
+The legacy run can also be contained in a longer multi-digit match. For example,
+`10121416` has the arithmetic progression 10, 12, 14, 16 and the legacy `012` run
+at span `[1, 4)`. Seeing both results is expected.
 
-| Class | ID / type | Defaults and rule | Limitations and likely false positives |
-|---|---|---|---|
-| `DictionaryWordDetector` | `dictionary.word` / `dictionary_word` | `min_word_length=3`; exact spelling and ASCII case-folded variants. | Ordinary words embedded in names or phrases can match. Case-sensitive matching semantics are limited to ASCII case folding; ranks come from the supplied data. |
-| `DictionaryCompoundDetector` | `dictionary.compound` / `dictionary_compound` | `min_word_length=3`, `max_suffix_length=16`; finds a supplied word at a Unicode-aware boundary followed by 1–16 ASCII digits and/or punctuation. | Requires a word boundary before the dictionary word and after the suffix. Does not recognize spaces, non-ASCII suffix characters, prefixes, or infixes. |
-| `ReversedWordDetector` | `dictionary.reversed_word` / `reversed_word` | `min_word_length=4`; detects reversed entries case-insensitively and skips palindromes. | Short accidental reverse substrings can match. |
-| `LeetspeakDetector` | `dictionary.leetspeak` / `leetspeak_word` | `max_substitutions=3`, `min_word_length=4`, `max_active_states=4096`, `max_work=1_000_000`. Length-preserving alternatives default to `@/4→a`, `0→o`, `3→e`, `5/$→s`, `7→t`, `1→i/l`, `!→i`. | Deliberate or ambiguous substitutions can match. A work/state limit raises `DictionarySearchLimitError`; it does not silently truncate. |
+### Numeric match metadata
 
-`DictionaryLexicon` defaults to word lengths 1–128, 100,000 supplied entries, and
-2,000,000 total supplied code points. It permits `"none"` or `"nfc"` normalization;
-NFC entries must already be NFC-normalized. Exact duplicate spellings resolve to the
-lowest rank then stable source ID. Case variants remain separate. A normalization-
-aware dictionary detector must agree with `EngineConfig.normalization`.
+Numeric results are `NumericPatternMatch` objects, a subtype of `PatternMatch`. In
+addition to the match span and standard length/direction evidence, they contain:
 
-`DictionaryCompoundDetector` uses only the supplied lexicon. Its `max_suffix_length`
-must be between 1 and 128; the default is 16. A suffix is a contiguous run of ASCII
-digits or ASCII punctuation and may contain both (for example `-2026!`). It must
-contain at least one character. `LENGTH` reports the full compound span, `RANK` and
-`CASE_EXACT` describe the matched word, and `COUNT` reports suffix characters. Results
-contain spans and numeric/boolean evidence, not the matched word or suffix.
+- `terms`: integer values and half-open spans for each interpreted term.
+- `parameter_numerator` and `parameter_denominator`: arithmetic difference over 1,
+  or a reduced geometric ratio. Prime and Fibonacci-like matches have no parameter.
+- `ambiguous`: whether multiple valid term-boundary interpretations share the span.
 
-The labeled synthetic examples in
-[`tests/fixtures/dictionary-compound-synthetic-v1.json`](../tests/fixtures/dictionary-compound-synthetic-v1.json)
-exercise the documented rules and exact span positions. Their pass counts are
-rule-conformance checks only; these hand-authored examples do not estimate real-world
-false-positive or false-negative rates.
+For `2468`, the terms are `(2, 4, 6, 8)`, the difference is `2/1`, and the direction
+evidence is `1` for ascending. Span indices are into `processed_text`; see
+[Unicode and positions](unicode.md).
 
-## Contextual
+### Numeric work limits
 
-| Class | ID / type | Defaults and rule | Limitations and likely false positives |
-|---|---|---|---|
-| `CalendarDateDetector` | `contextual.calendar_date` / `calendar_date` | Years 1900–2099, `date_order="auto"`, compact dates disabled. Recognizes `YYYY-MM-DD`, `YYYY/MM/DD`, `DD-MM-YYYY`, `DD/MM/YYYY`, `MM-DD-YYYY`, and `MM/DD/YYYY`, with the same separator within each date. | Numeric identifiers resembling valid dates can match; ambiguous day/month forms are marked. |
-| `YearDetector` | `contextual.year` / `four_digit_year` | Inclusive 1900–2099; maximal runs of exactly four ASCII digits. | Years in dates intentionally overlap date matches; other 4-digit IDs can match. |
-| `KeyboardWalkDetector` | `contextual.keyboard_walk` / `keyboard_walk` | `min_walk_length=4`, `max_turns=1`, `layout="us_qwerty"`. ASCII letter/digit paths on a simplified adjacency model. `layout` may be a caller-supplied `KeyboardLayout`. | No built-in non-US layouts, shifted punctuation, or mobile keyboards; ordinary key sequences may match. |
+The detector bounds run length, term size, candidate count, term count, and total
+interpretation work. `min_sequence_length` defaults to 3 and must be at least 2.
+Other defaults and maximum supported values are:
 
-`CalendarDateDetector` also accepts `min_year`, `max_year`, `date_order` (`"auto"`,
-`"dmy"`, `"mdy"`, `"ymd"`), and `allow_compact=False`. `YearDetector` accepts inclusive
-`min_year` and `max_year`. `KeyboardWalkDetector` accepts `"us_qwerty"` or a
-`KeyboardLayout` instance. A custom layout supplies a mapping from lowercase ASCII
-letters or digits to integer `(x, y)` key coordinates; adjacency uses the same
-documented physical-spacing rule as `US_QWERTY`.
-`default_contextual_detectors()` creates all three defaults.
+| Option | Default | Maximum |
+|---|---:|---:|
+| `max_digit_run` | 32 | 32 digits |
+| `max_term_digits` | 6 | 6 digits |
+| `max_term_value` | 999,999 | 999,999 |
+| `max_terms` | 8 | 16 |
+| `max_candidates` | 8,192 | 32,768 |
+| `max_work` | 100,000 | 100,000 work units |
 
-For day/month dates, `"dmy"` and `"mdy"` select the preferred interpretation when both
-are valid; a sole valid alternative is still accepted. `"auto"` records ambiguity
-instead of emitting duplicate spans. `"ymd"` accepts only year-first forms.
-`allow_compact=True` enables `YYYYMMDD` only for `"auto"` or `"ymd"`. Date `DATE_ORDER`
-evidence is an integer code: 0 means an ambiguous auto interpretation, 1 year-month-day,
-2 day-month-year, and 3 month-day-year. Dates are validated with Gregorian calendar
-rules and bounded by the configured inclusive years.
+You can lower these limits within their supported ranges. A longer digit run raises
+`NumericSequenceLimitError`; it is not silently truncated. The engine also applies its
+input and total-match limits. Configure and catch these errors according to your
+application's needs.
 
-The keyboard detector accepts ASCII letters/digits only, is case-insensitive, and
-rejects repeated consecutive keys and immediate reversals. It classifies changes in
-eight directions as turns. `max_turns` controls the number of direction runs in a
-reported window; overlapping valid windows are retained. The default US layout is
-unchanged; custom layouts let applications model additional physical key arrangements.
+## Dictionary patterns
 
-## Overlaps and ordering
+Dictionary detectors scan only entries in your `DictionaryLexicon`; PassPattern does
+not include an authoritative word or password list.
 
-Detectors run sequentially in registration order, but the engine sorts final results
-deterministically. It does not merge different patterns or remove valid overlaps:
-examples include a four-digit year inside a date and a repeated substring alongside a
-dictionary word.
+| Detector | Pattern type | Default behavior |
+|---|---|---|
+| `DictionaryWordDetector` | `dictionary_word` | Finds supplied words with exact or ASCII case-insensitive matching; minimum word length 3. |
+| `DictionaryCompoundDetector` | `dictionary_compound` | Finds a word at a Unicode-aware boundary followed by 1–16 ASCII digits and/or punctuation, ending at a word boundary. |
+| `ReversedWordDetector` | `reversed_word` | Finds reversed entries case-insensitively; minimum length 4; skips palindromes. |
+| `LeetspeakDetector` | `leetspeak_word` | Finds bounded, length-preserving substitutions; default maximum is 3 substitutions and minimum word length is 4. |
+
+Ordinary words, names, and deliberate substitutions may match by coincidence. Ranks
+and exact-case status come from the supplied data; they are not estimates of password
+strength. Dictionary and transformation detectors have their own input, state, and
+work bounds. A transformation search that exceeds its budget raises
+`DictionarySearchLimitError`, not a partial result.
+
+`DictionaryLexicon` defaults to word lengths 1–128, at most 100,000 entries, and at
+most 2,000,000 total code points across supplied entries. Its normalization mode is
+`"none"` or `"nfc"` and must agree with the engine. With NFC mode, entries must
+already be normalized. Exact duplicate spellings are resolved by lowest rank and
+then stable source ID; differently cased spellings remain distinct.
+
+The compound detector requires a boundary before the dictionary word and after its
+suffix. The suffix is a nonempty contiguous run of ASCII digits and/or punctuation;
+it can mix both, as in `example-2026!`. Its `LENGTH` evidence covers the whole match,
+`RANK` and `CASE_EXACT` describe the word, and `COUNT` is the suffix length.
+
+Leetspeak substitutions are length-preserving. By default, `@` and `4` can represent
+`a`, `0` can represent `o`, `3` can represent `e`, `5` and `$` can represent `s`, `7`
+can represent `t`, `1` can represent `i` or `l`, and `!` can represent `i`. The
+detector has a 4,096-active-state limit and a 1,000,000-work limit in addition to its
+three-substitution default.
+
+The
+[synthetic compound-detector examples](../tests/fixtures/dictionary-compound-synthetic-v1.json)
+exercise exact matching rules; they do not measure real-world detection accuracy.
+
+## Contextual patterns
+
+| Detector | Pattern type | Default behavior |
+|---|---|---|
+| `CalendarDateDetector` | `calendar_date` | Valid dates from 1900–2099 in year-month-day, day-month-year, or month-day-year forms; compact dates are off by default. |
+| `YearDetector` | `four_digit_year` | Maximal four-digit ASCII years from 1900–2099. |
+| `KeyboardWalkDetector` | `keyboard_walk` | ASCII letter/digit paths on a simplified US QWERTY layout; minimum length 4 and at most one direction change. |
+
+The accepted separated date formats are `YYYY-MM-DD`, `YYYY/MM/DD`, `DD-MM-YYYY`,
+`DD/MM/YYYY`, `MM-DD-YYYY`, and `MM/DD/YYYY`; each date uses one separator throughout.
+Dates are checked against Gregorian calendar rules. Valid-looking dates and years may
+be identifiers rather than intentional dates, and a year inside a date is also
+reported as a year match.
+
+`CalendarDateDetector` accepts inclusive `min_year`, `max_year`, `date_order`
+(`"auto"`, `"dmy"`, `"mdy"`, or `"ymd"`), and `allow_compact`. Compact `YYYYMMDD`
+dates are enabled only for `"auto"` or `"ymd"`. In `"auto"` mode, ambiguous
+day/month interpretations are marked instead of duplicated. `DATE_ORDER` evidence
+uses 0 for an ambiguous auto result, 1 for year-month-day, 2 for day-month-year, and
+3 for month-day-year. `"dmy"` and `"mdy"` select a preferred interpretation when both
+are valid but accept a sole valid alternative. `"ymd"` accepts only year-first forms.
+
+`YearDetector` accepts inclusive `min_year` and `max_year`. The keyboard detector
+accepts a caller-supplied `KeyboardLayout` with ASCII letters or digits mapped to
+integer `(x, y)` coordinates. It uses eight movement directions, rejects repeated
+consecutive keys and immediate reversals, and counts direction changes as turns.
+Overlapping valid walks are kept. Shifted punctuation and mobile keyboards are not
+modeled.
+
+## Ordering and overlaps
+
+Detectors run in registration order. The engine then sorts matches deterministically
+by span, detector ID, category, pattern type, and evidence. It preserves valid
+overlaps, such as a year inside a date or a repeated substring alongside a dictionary
+match.

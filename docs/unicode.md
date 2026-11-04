@@ -1,44 +1,42 @@
 # Unicode and match positions
 
-## Processed text and code-point spans
+PassPattern reports spans in the text that detectors actually inspect. Understanding
+that text is important when you display or compare a match.
 
-Input validation and optional NFC normalization are performed by the separate native
-dependency. Detectors inspect `PreparedPassword.processed_text`.
-`PatternMatch.start_index` and `end_index` are zero-based, half-open Python string
-indices: they count Unicode code points in that processed string.
+## Code-point offsets
 
-These offsets are not UTF-8 byte positions or grapheme-cluster positions. A visible
-grapheme may contain multiple code points (for example a base letter plus a combining
-mark, or an emoji sequence). A UI must not treat a code-point index as a user-perceived
-character index without converting it.
+`start_index` is the first code-point index in a match; `end_index` is the index just
+after it. The range is half-open: `[start_index, end_index)`. Indices count Python
+Unicode code points in `PreparedPassword.processed_text`, not UTF-8 bytes or
+user-perceived characters.
 
-With `normalization="nfc"`, the processed string can have different code points and a
-different length from the submitted string. Use spans only with the processed text
-from the same native preparation if you need to map them to text; the engine does not
-return that text in its result.
+For example, the string `🙂x2468` has the four digits at span `[2, 6)` in Python
+code-point indexing. Some visible characters contain multiple code points: `é`
+(the letter `e` followed by a combining acute accent) is two code points, though it
+often appears as one character.
 
-## Unicode scalar values and runtime versions
+Do not use these offsets directly as byte offsets or grapheme indices in a user
+interface. Convert them to the indexing system used by your UI.
 
-Python strings can contain surrogate code points even though they are not Unicode
-scalar values. Native input validation rejects unsupported Unicode before detection.
-`DictionaryEntry` independently rejects surrogate code points. `DictionaryLexicon`
-records `unicodedata.unidata_version`; the native library uses the Unicode
-data compiled into its build. This repository does not guarantee that the Python and
-native Unicode database versions match. Verify the installed native build and Python
-runtime together when exact cross-runtime normalization behavior matters.
+## Normalization
 
-## Matching policies
+The native text-processing dependency validates the input and optionally normalizes
+it to NFC. Detectors inspect the resulting `processed_text`. When you set
+`normalization="nfc"`, that text can have a different length from the submitted text,
+so a span may not map directly to the original string. The analysis result does not
+include the processed text; keep the exact prepared text separately if your application
+needs to display matched positions.
 
-Structural repeated-character and repeated-substring detection operate on Unicode code
-points. Numeric and alphabetic sequence detectors intentionally accept only ASCII
-digits and letters. Contextual dates, years, and keyboard walks also use ASCII
-characters.
+## Matching scope
 
-Dictionary matching uses ASCII-only case folding, not full Unicode `casefold()`.
-Non-ASCII letters are preserved as supplied; visually similar characters are not
-treated as equivalent. NFC dictionary lexicons require entries already normalized to
-NFC, and their normalization mode must match the engine.
+- Repeated-character and repeated-substring detectors operate on Unicode code points.
+- Numeric and alphabetic sequences, dates, years, and keyboard walks use ASCII digits
+  and/or letters as described in the [detector guide](detectors.md).
+- Dictionary matching uses ASCII case folding, not full Unicode case folding. Similar
+  looking characters are not treated as equivalent.
+- A dictionary configured for NFC requires entries already normalized to NFC and the
+  engine to use the same normalization mode.
 
-These policies are deliberate scope boundaries, not claims that Unicode text has one
-universal representation. Applications should choose normalization and dictionaries
-that match their own authentication system.
+Python and the native dependency may use different Unicode database versions. Exact
+cross-runtime normalization can therefore depend on the installed versions; test the
+versions you deploy if that distinction matters.

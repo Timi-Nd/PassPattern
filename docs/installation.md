@@ -1,19 +1,24 @@
 # Installation
 
-PassPattern is a research repository installed from a checkout; it is not published to
-PyPI. Analysis requires the public `passtext-native` 0.1.x binary wheel, which the
-`dev` extra installs from PyPI. No Rust toolchain, private credentials, or private
-source is needed.
+PassPattern is installed from this repository; it is not published as a PyPI package.
+You need a checkout and a compatible `passtext-native` wheel to analyze text. The
+development install below adds that dependency along with the test and quality tools.
 
 ## Requirements
 
-- CPython 3.10 or newer. CI runs 3.10 and 3.14 on Windows and Linux.
-- Native wheel platforms: Windows x86-64 and Linux x86-64 (manylinux 2.28), CPython
-  3.10+ via the stable ABI. macOS, ARM, musl Linux, and PyPy are not verified; pip
-  fails to resolve a wheel there rather than attempting a Rust build, and analysis
-  raises `NativeExtensionUnavailableError` if the wheel is absent.
+- CPython 3.10 or newer.
+- A `passtext-native` 0.1.x wheel compatible with your Python version, operating
+  system, and CPU architecture.
+
+The published wheels currently target 64-bit Windows and 64-bit Linux (manylinux
+2.28). Other combinations, including macOS, ARM, musl-based Linux, and PyPy, are not
+verified here. Wheel availability can change; check the package's
+[PyPI page](https://pypi.org/project/passtext-native/) for the current release.
+PassPattern does not build the native extension from source.
 
 ## Windows PowerShell
+
+Run these commands from the repository root:
 
 ```powershell
 py -3.14 -m venv .venv
@@ -22,7 +27,16 @@ python -m pip install --upgrade pip
 python -m pip install -e ".[dev]"
 ```
 
-## Linux
+If PowerShell prevents environment activation, use the environment's executable
+directly:
+
+```powershell
+.\.venv\Scripts\python.exe -m pip install -e ".[dev]"
+```
+
+## Linux and macOS
+
+Run these commands from the repository root:
 
 ```sh
 python3 -m venv .venv
@@ -31,20 +45,28 @@ python -m pip install --upgrade pip
 python -m pip install -e ".[dev]"
 ```
 
-To install only the runtime pieces, install the wheel and the package separately:
+The native wheel may not be available for every operating system or architecture.
+Installing the development dependencies will report that directly if no compatible
+wheel can be found.
+
+## Runtime-only install
+
+If you do not need the development tools, install the native dependency and the
+checkout separately:
 
 ```sh
-python -m pip install --only-binary ":all:" "passtext-native>=0.1.0,<0.2.0"
+python -m pip install --only-binary=:all: "passtext-native>=0.1.0,<0.2.0"
 python -m pip install -e .
 ```
 
-Do not copy native binaries or implementation source into the repository.
+## Troubleshooting
 
-## Common issues
+- **`import passpattern` works, but `analyze()` fails:** verify that the native wheel
+  is installed in the same Python environment.
+- **No matching wheel is available:** check the Python version, platform, and
+  architecture on the native dependency's PyPI page. PassPattern does not compile it
+  locally.
+- **An API compatibility error appears:** use a supported `passtext-native` 0.1.x
+  release.
 
-- **Import works but analysis fails:** `passtext-native` is missing, or its wheel does
-  not match your platform or Python. Reinstall it in the same environment.
-- **The extension has the wrong API:** install a 0.1.x release; PassPattern reports
-  this without exposing internal exception details.
-- **PowerShell activation is blocked:** run `.venv\Scripts\python.exe` directly instead
-  of changing the system execution policy.
+For a first analysis, continue to the [quickstart](quickstart.md).

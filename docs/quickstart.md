@@ -1,29 +1,71 @@
 # Quickstart
 
-All examples use synthetic data. A compatible `passtext-native` 0.1.x binary wheel
-from public PyPI is required to call `analyze()`. Install it into the same environment:
+These examples use synthetic inputs. Install PassPattern from a checkout before
+running them; see [Installation](installation.md). Analysis also requires a compatible
+`passtext-native` wheel.
 
-```powershell
-python -m pip install --only-binary=:all: "passtext-native>=0.1.0,<0.2.0"
+## Find an arithmetic sequence
+
+You choose and register detectors. This example runs only the numeric detector:
+
+```python
+from passpattern import PassPatternEngine
+from passpattern.structural import NumericSequenceDetector
+
+engine = PassPatternEngine([NumericSequenceDetector()])
+result = engine.analyze("2468")
+
+for match in result.matches:
+    values = [term.value for term in match.terms]
+    print(
+        f"{match.pattern_type} [{match.start_index}, {match.end_index}): "
+        f"terms={values}, difference={match.parameter_numerator}"
+    )
 ```
 
-Without the extension, analysis raises `NativeExtensionUnavailableError`.
+Expected output:
 
-## Interactive analyzer
+```text
+arithmetic_progression [0, 4): terms=[2, 4, 6, 8], difference=2
+```
 
-From the repository root, install the development dependencies and run:
+The span `[0, 4)` means the match starts at code-point index 0 and ends before index
+4. The terms explain how the detector interpreted the digits; the difference is an
+exact integer. This result is not a strength score.
+
+## Inspect more structural patterns
+
+`default_structural_detectors()` registers repeated-character, repeated-substring,
+numeric, and alphabetic detectors:
+
+```python
+from passpattern import PassPatternEngine
+from passpattern.structural import default_structural_detectors
+
+engine = PassPatternEngine(default_structural_detectors())
+result = engine.analyze("aaa1212abc")
+for match in result.matches:
+    print(match.pattern_type, (match.start_index, match.end_index))
+```
+
+The engine sorts results by span and detector metadata. It keeps valid overlaps
+instead of merging different pattern types.
+
+## Try the interactive analyzer
+
+From the repository root, run:
 
 ```powershell
-python -m pip install -e ".[dev]"
 python .\scripts\analyze_password.py
 ```
 
-Enter the password at the hidden prompt. The script runs all structural and
-contextual detectors and prints every match's detector, category, pattern type,
-processed-text span, and evidence. It does not print or save the password or matched
-text. Spans are zero-based, half-open Unicode code-point offsets; with NFC
-normalization they refer to normalized text. To enable the three dictionary
-detectors, supply a JSON file containing ranked entries:
+The analyzer asks for input through a hidden prompt and prints match types, spans,
+and evidence. It requires an interactive terminal; it does not accept a password as a
+command-line argument or through a pipe. Use synthetic inputs while learning the
+output format.
+
+The tool registers structural and contextual detectors by default. To enable its
+dictionary detectors, create a JSON lexicon:
 
 ```json
 {
@@ -34,30 +76,19 @@ detectors, supply a JSON file containing ranked entries:
 }
 ```
 
+Then pass the file path:
+
 ```powershell
 python .\scripts\analyze_password.py --dictionary .\my-words.json
 ```
 
-Use only a private lexicon you are authorized to use. The tool requires an
-interactive terminal and does not accept a password as a command-line argument or
-from a pipe, to reduce accidental exposure.
+Use only a lexicon you are authorized to use. PassPattern does not bundle a password
+list.
 
-## Structural patterns
+## Add a dictionary detector
 
-```python
-from passpattern import PassPatternEngine
-from passpattern.structural import default_structural_detectors
-
-engine = PassPatternEngine(default_structural_detectors())
-result = engine.analyze("aaa1212abc")
-for match in result.matches:
-    print(match.detector_id, match.pattern_type, match.start_index, match.end_index)
-```
-
-## Dictionary words
-
-PassPattern does not bundle an authoritative password dictionary; supply entries
-appropriate to your application.
+You can supply a small lexicon directly in Python. This example reports the span of
+`Example` in a synthetic input:
 
 ```python
 from passpattern import PassPatternEngine
@@ -67,61 +98,26 @@ from passpattern.dictionary import (
     DictionaryWordDetector,
 )
 
-lexicon = DictionaryLexicon(
-    (
-        DictionaryEntry("example", rank=1, source_id="synthetic"),
-        DictionaryEntry("garden", rank=2, source_id="synthetic"),
-    )
-)
+lexicon = DictionaryLexicon((DictionaryEntry("example", rank=1),))
 engine = PassPatternEngine((DictionaryWordDetector(lexicon),))
 result = engine.analyze("myExample42")
+print([(match.pattern_type, match.start_index, match.end_index) for match in result.matches])
 ```
 
-Dictionary matching accepts case-insensitive ASCII variants; exact case can be
-reported as numeric/boolean evidence. Dictionary normalization must agree with the
-engine configuration.
+Expected output:
 
-For a supplied word followed by digits or punctuation, use the separate compound
-detector:
-
-```python
-from passpattern import PassPatternEngine
-from passpattern.dictionary import (
-    DictionaryCompoundDetector,
-    DictionaryEntry,
-    DictionaryLexicon,
-)
-
-lexicon = DictionaryLexicon((DictionaryEntry("example", rank=1),))
-engine = PassPatternEngine((DictionaryCompoundDetector(lexicon),))
-result = engine.analyze("example-2026!")
+```text
+[('dictionary_word', 2, 9)]
 ```
 
-The compound detector is opt-in and reports the full word-plus-suffix span. It requires
-a word boundary on either side and uses a bounded ASCII suffix; see the
-[detector guide](detectors.md) for its limits.
+Dictionary matching is opt-in because applications should choose entries appropriate
+to their use case. See the [detector guide](detectors.md) for compound words,
+reversed-word, and leetspeak detectors.
 
-## Dictionary transformations
+## Add contextual detectors
 
-```python
-from passpattern import PassPatternEngine
-from passpattern.dictionary import (
-    DictionaryEntry,
-    DictionaryLexicon,
-    LeetspeakDetector,
-    ReversedWordDetector,
-)
-
-lexicon = DictionaryLexicon((DictionaryEntry("garden", rank=1),))
-engine = PassPatternEngine((ReversedWordDetector(lexicon), LeetspeakDetector(lexicon)))
-result = engine.analyze("nedrag g@rden")
-```
-
-Leetspeak substitutions are bounded and length-preserving. Both transformation
-detectors enforce explicit work limits and raise `DictionarySearchLimitError` rather
-than silently dropping work when a configured limit is exceeded.
-
-## Contextual patterns
+The contextual factory registers date, year, and default US QWERTY keyboard-walk
+detectors:
 
 ```python
 from passpattern import PassPatternEngine
@@ -129,37 +125,12 @@ from passpattern.contextual import default_contextual_detectors
 
 engine = PassPatternEngine(default_contextual_detectors())
 result = engine.analyze("2026-11-02 Qwerty")
+print([(match.pattern_type, match.start_index, match.end_index) for match in result.matches])
 ```
 
-Contextual detectors recognize selected date formats, four-digit years, and US QWERTY
-walks. Recognition is not a strength or guessability score.
+Dates and years are recognized only within their documented ranges and formats.
+Keyboard walks depend on the selected layout. None of these matches estimates
+guessability.
 
-## Combined registration
-
-```python
-from passpattern import PassPatternEngine
-from passpattern.contextual import default_contextual_detectors
-from passpattern.dictionary import (
-    DictionaryEntry,
-    DictionaryLexicon,
-    DictionaryWordDetector,
-    LeetspeakDetector,
-    ReversedWordDetector,
-)
-from passpattern.structural import default_structural_detectors
-
-lexicon = DictionaryLexicon((DictionaryEntry("garden", rank=1),))
-detectors = (
-    *default_structural_detectors(),
-    DictionaryWordDetector(lexicon),
-    ReversedWordDetector(lexicon),
-    LeetspeakDetector(lexicon),
-    *default_contextual_detectors(),
-)
-engine = PassPatternEngine(detectors)
-result = engine.analyze("g@rden2026")
-```
-
-Detector registration order controls execution, but output matches are sorted
-deterministically. Overlapping matches from different detectors are preserved. Avoid
-printing real passwords, complete input strings, or analysis output in production.
+For all date formats, numeric-family options, and safety limits, read the
+[detector guide](detectors.md).

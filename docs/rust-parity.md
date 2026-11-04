@@ -1,91 +1,60 @@
-# Python/Rust parity workflow
+# Shared behavior across implementations
 
-PassPattern is the Python research and reference implementation. The intended
-production pattern engine, PassPattern-Core, is not present in this repository and is
-not yet implemented. This document proposes component boundaries and a review process;
-it does not create a Rust crate or assume access to a private Rust dependency.
+PassPattern's Python implementation defines executable detector behavior and is
+tested against a language-neutral JSON fixture. The fixture makes it possible to
+compare an independent implementation without relying on matching source code.
 
-## Component boundaries
+There is no Rust pattern engine in this repository. A Rust implementation would also
+need an authorized native text-preparation interface; the Python adapter to
+`passtext-native` is not that interface.
 
-The current Python implementation provides the behavior to specify:
+## The shared fixture
 
-| Responsibility | Python reference | Rust implementation boundary |
-| --- | --- | --- |
-| Input preparation | `passpattern/native.py` adapts to the published `passtext_native` API. | Call an authorized Rust-facing PassText API directly; do not call Python bindings or vendor private source. The dependency/interface must be established before implementation. |
-| Configuration and limits | `passpattern/config.py` | Typed engine configuration with matching limits and normalization contract. |
-| Detector contract and output | `passpattern/detector.py`, `passpattern/models.py` | Detector trait and result types preserving category, type, evidence, and half-open spans. |
-| Coordination and errors | `passpattern/engine.py`, `passpattern/errors.py` | Prepare once, invoke selected detectors, validate outputs, preserve documented errors, and deterministically order results. |
-| Recognition algorithms | `passpattern/structural/`, `passpattern/dictionary/`, `passpattern/contextual/` | Implement detectors in small parity-approved increments, preserving each documented rule and metadata. |
-| Correctness fixtures | `tests/vectors/passpattern-v2.json` | Consume the same JSON fixture and compare every field defined by its schema. |
+[`tests/vectors/passpattern-v2.json`](../tests/vectors/passpattern-v2.json) has schema
+version 2. Each vector provides an input, engine configuration, detector IDs and
+options, and either ordered matches or an expected error. A match includes its
+detector ID, category, pattern type, half-open span, and evidence.
 
-A reasonable initial Rust module layout, once its repository and dependency are
-authorized, is `config`, `text`, `model`, `errors`, `engine`, and `detectors` with
-structural, dictionary, and contextual submodules. Keep detector modules independent
-from the binding layer. The Python adapter remains the interface to the native Python
-wheel; it is not the Rust-to-Rust integration API.
+Numeric matches also include:
 
-## Shared vector format
+- `numeric_terms`: ordered integer values and their spans.
+- `parameter`: an exact integer numerator/denominator pair or `null`.
+- `ambiguous`: whether other valid term boundaries exist for the same span.
 
-The versioned fixture at `tests/vectors/passpattern-v2.json` is language-neutral JSON.
-Each vector includes:
+Spans count Unicode code points in `processed_text` after configured normalization.
+They are not byte or grapheme offsets. Output order matters; evidence object key order
+does not.
 
-- A stable ID, input value, detector IDs and options, and engine configuration.
-- Either ordered match expectations or an expected error code.
-- Match detector ID, category, pattern type, `span` as `[start, end]`, and typed
-  evidence values.
+## Numeric behavior to reproduce
 
-Schema version 2 additionally serializes numeric match metadata: `numeric_terms` is an
-ordered list of `{value, span}` objects, `parameter` is an exact integer
-`[numerator, denominator]` pair or `null`, and `ambiguous` reports alternate valid
-term boundaries for the same span. Numeric family identifiers, canonical term
-segmentation, defaults, thresholds, and resource limits are specified in
-[detectors](detectors.md#structural). In particular, prime matches must represent
-consecutive primes; they are not satisfied by an arbitrary list of prime values.
-When one family and span has multiple valid segmentations, select the one with the most
-terms, then the earliest boundaries; mark all affected matches for that span as
-ambiguous.
+The fixture covers the legacy `+1`/`-1` digit family, arithmetic progressions,
+consecutive primes, and opt-in geometric and Fibonacci-like patterns. For example,
+`10121416` contains the arithmetic terms 10, 12, 14, 16, with difference 2. A prime
+match such as `235711` must be consecutive in the prime list, not merely a set of
+prime-valued terms.
 
-`schema_version` governs format changes. Spans are zero-based, half-open Unicode
-code-point offsets into the processed text after configured normalization; they are
-not UTF-8 byte offsets or grapheme indices. Output list order is significant and must
-match the engine's documented deterministic ordering. Evidence object key order is
-not significant. Rust parity must compare all numeric term values, term spans,
-parameters, and ambiguity status, not just the enclosing match span.
+Multi-digit terms use canonical decimal notation; only a single-digit term can be
+zero-prefixed (that is, the term `0`). Numeric family thresholds, defaults, and
+limits are in the [detector guide](detectors.md#numeric-sequences). For multiple
+segmentations over the same span, select the interpretation with the most terms, then
+the earliest boundaries, and mark the affected matches ambiguous.
 
-Expected results are specified from the reviewed detector rules in
-[detectors](detectors.md) and hand-checked cases, not generated from the Python
-implementation at test time. Add a vector when a rule, boundary, Unicode behavior,
-overlap, metadata field, or error contract is clarified. A Rust consumer should fail
-on unknown schema versions or detector IDs instead of silently skipping a case.
+## Comparing results
 
-## Equivalence and review cycle
+The Python tests read the fixture directly with
+`python -m pytest tests/test_shared_vectors.py`. A compatible implementation should
+compare every field: errors, ordering, detector and pattern identifiers, spans,
+evidence, numeric terms, parameters, and ambiguity.
 
-For each detector, work in this order:
+Treat the written detector rules as the specification; the Python implementation is
+an executable reference, not a substitute for reviewing a discrepancy. If an
+implementation differs, decide whether the code or the documented rule is wrong
+before changing expected results.
 
-1. Refine the Python prototype and its documented intended behavior.
-2. Add focused Python tests and reviewed shared vectors.
-3. Implement the specified component in Rust without treating Python output alone as
-   the specification. Numeric parity must preserve the unit-step compatibility path,
-   canonical bounded segmentation (including the single-digit zero rule), exact
-   integer relationships, opt-in experimental families, and content-free limit
-   errors.
-4. Run the same fixture against both implementations and compare errors, output
-   ordering, detector/category/type, spans, and all evidence.
-5. Investigate every discrepancy against the written rule; update the specification
-   and expected fixture only after review.
-6. Benchmark deterministic synthetic cases separately from correctness tests, then
-   approve the component before starting the next one.
+## What parity does not cover
 
-The vectors are correctness gates, not benchmarks. Existing Python benchmark scripts
-use deterministic synthetic inputs and do not belong in correctness tests or timing
-thresholds.
-
-## First implementation milestone
-
-The smallest useful first detector is **repeated characters**: recognize maximal runs
-of an identical Unicode scalar value, apply the configured minimum run length, report
-the exact count, and use half-open code-point spans. The shared vectors already
-exercise non-ASCII scalar indexing and NFC-processed indexing. Before coding it,
-establish the authorized Rust repository and Rust-facing PassText interface; neither
-is configured or included here. Do not create a new repository or expose private
-source as part of this milestone.
+The fixture checks the behaviors it contains; it does not prove that two systems are
+equivalent for every possible input. Add reviewed cases when you introduce a family
+or clarify a boundary, and keep performance benchmarks separate from correctness
+tests. The Python native adapter and any other runtime's text-preparation component
+must be compared independently for Unicode and normalization behavior.
