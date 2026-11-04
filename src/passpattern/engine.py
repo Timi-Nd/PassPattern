@@ -112,6 +112,8 @@ class PassPatternEngine:
         try:
             results = detector.detect(prepared_password)
             iterator = iter(results)
+        except DictionarySearchLimitError:
+            raise
         except Exception:
             raise DetectorExecutionError("A detector failed.") from None
 

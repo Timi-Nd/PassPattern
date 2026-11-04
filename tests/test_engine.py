@@ -307,6 +307,24 @@ def test_engine_propagates_explicit_dictionary_search_limit(
         PassPatternEngine((detector,)).analyze("synthetic")
 
 
+def test_engine_propagates_eager_dictionary_search_limit(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(
+        "passpattern.engine.prepare_password",
+        lambda password, config: Prepared(password),
+    )
+
+    class EagerLimitedDetector:
+        detector_id = "eager_limited"
+
+        def detect(self, prepared_password: Prepared):
+            raise DictionarySearchLimitError("synthetic work limit")
+
+    with pytest.raises(DictionarySearchLimitError, match="work limit"):
+        PassPatternEngine((EagerLimitedDetector(),)).analyze("synthetic")
+
+
 def test_engine_sanitizes_detector_exceptions(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr(
         "passpattern.engine.prepare_password",
