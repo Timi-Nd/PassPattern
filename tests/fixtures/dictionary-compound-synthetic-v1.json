@@ -1,0 +1,96 @@
+{
+  "schema_version": 1,
+  "purpose": "Synthetic rule-conformance examples; not a real-world accuracy evaluation.",
+  "lexicon": [
+    {
+      "word": "garden",
+      "rank": 1
+    }
+  ],
+  "cases": [
+    {
+      "id": "digits",
+      "label": "positive",
+      "input": "garden2026",
+      "expected_spans": [[0, 10]]
+    },
+    {
+      "id": "punctuation",
+      "label": "positive",
+      "input": "Garden!",
+      "expected_spans": [[0, 7]]
+    },
+    {
+      "id": "mixed-suffix",
+      "label": "positive",
+      "input": "garden-2026!",
+      "expected_spans": [[0, 12]]
+    },
+    {
+      "id": "unicode-prefix-offset",
+      "label": "positive",
+      "input": "🙂garden42",
+      "expected_spans": [[1, 9]]
+    },
+    {
+      "id": "multiple-punctuation",
+      "label": "positive",
+      "input": "garden!?",
+      "expected_spans": [[0, 8]]
+    },
+    {
+      "id": "maximum-suffix-length",
+      "label": "positive",
+      "input": "garden1234567890123456",
+      "expected_spans": [[0, 22]]
+    },
+    {
+      "id": "word-prefix",
+      "label": "negative",
+      "input": "mygarden2026",
+      "expected_spans": []
+    },
+    {
+      "id": "word-continuation",
+      "label": "negative",
+      "input": "garden2026x",
+      "expected_spans": []
+    },
+    {
+      "id": "word-without-suffix",
+      "label": "negative",
+      "input": "garden",
+      "expected_spans": []
+    },
+    {
+      "id": "space-separated-suffix",
+      "label": "negative",
+      "input": "garden 2026",
+      "expected_spans": []
+    },
+    {
+      "id": "non-ascii-suffix",
+      "label": "negative",
+      "input": "gardené",
+      "expected_spans": []
+    },
+    {
+      "id": "combining-mark-continuation",
+      "label": "negative",
+      "input": "garden2026́",
+      "expected_spans": []
+    },
+    {
+      "id": "suffix-over-maximum",
+      "label": "negative",
+      "input": "garden12345678901234567",
+      "expected_spans": []
+    },
+    {
+      "id": "punctuation-then-word",
+      "label": "negative",
+      "input": "garden-é",
+      "expected_spans": []
+    }
+  ]
+}

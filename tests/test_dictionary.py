@@ -1,6 +1,8 @@
+import json
 import unicodedata
 from dataclasses import FrozenInstanceError, dataclass
 from itertools import product
+from pathlib import Path
 
 import pytest
 
@@ -376,6 +378,46 @@ def test_dictionary_compound_enforces_configured_suffix_bound() -> None:
 
     assert len(detect_compounds(lexicon, "dragon1234", max_suffix_length=4)) == 1
     assert detect_compounds(lexicon, "dragon12345", max_suffix_length=4) == ()
+
+
+def test_dictionary_compound_synthetic_evaluation_corpus() -> None:
+    corpus_path = Path(__file__).parent / "fixtures" / "dictionary-compound-synthetic-v1.json"
+    corpus = json.loads(corpus_path.read_text(encoding="utf-8"))
+    assert corpus["schema_version"] == 1
+    assert corpus["purpose"] == (
+        "Synthetic rule-conformance examples; not a real-world accuracy evaluation."
+    )
+    assert corpus["cases"]
+    assert len({case["id"] for case in corpus["cases"]}) == len(corpus["cases"])
+    lexicon = DictionaryLexicon(DictionaryEntry(**entry) for entry in corpus["lexicon"])
+    detector = DictionaryCompoundDetector(lexicon)
+    counts = {"true_positive": 0, "false_negative": 0, "false_positive": 0, "true_negative": 0}
+
+    for case in corpus["cases"]:
+        assert case["label"] in ("positive", "negative")
+        actual = tuple(
+            (match.start_index, match.end_index)
+            for match in detector.detect(Prepared(case["input"]))
+        )
+        expected = tuple(tuple(span) for span in case["expected_spans"])
+        assert actual == expected, case["id"]
+        is_positive = case["label"] == "positive"
+        is_detected = bool(actual)
+        if is_positive and is_detected:
+            counts["true_positive"] += 1
+        elif is_positive:
+            counts["false_negative"] += 1
+        elif is_detected:
+            counts["false_positive"] += 1
+        else:
+            counts["true_negative"] += 1
+
+    assert counts == {
+        "true_positive": 6,
+        "false_negative": 0,
+        "false_positive": 0,
+        "true_negative": 8,
+    }
 
 
 @pytest.mark.parametrize(

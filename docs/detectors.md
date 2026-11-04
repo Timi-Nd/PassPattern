@@ -42,6 +42,12 @@ contain at least one character. `LENGTH` reports the full compound span, `RANK` 
 `CASE_EXACT` describe the matched word, and `COUNT` reports suffix characters. Results
 contain spans and numeric/boolean evidence, not the matched word or suffix.
 
+The labeled synthetic examples in
+[`tests/fixtures/dictionary-compound-synthetic-v1.json`](../tests/fixtures/dictionary-compound-synthetic-v1.json)
+exercise the documented rules and exact span positions. Their pass counts are
+rule-conformance checks only; these hand-authored examples do not estimate real-world
+false-positive or false-negative rates.
+
 ## Contextual
 
 | Class | ID / type | Defaults and rule | Limitations and likely false positives |
