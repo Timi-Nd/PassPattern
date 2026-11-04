@@ -65,9 +65,7 @@ Set `experimental_families` to opt in:
 from passpattern.structural import NumericSequenceDetector
 
 detector = NumericSequenceDetector(
-    experimental_families=frozenset(
-        {"geometric_progression", "fibonacci_like_progression"}
-    )
+    experimental_families=frozenset({"geometric_progression", "fibonacci_like_progression"})
 )
 ```
 
