@@ -36,12 +36,28 @@ Operate on the supplied native `processed_text`; return `PatternMatch` objects w
 half-open code-point spans and typed numeric/boolean evidence. Do not put password
 text, matched words, or arbitrary text in evidence, logs, or exceptions.
 
+Numeric sequence families are implemented in three pieces: ASCII run and canonical
+term interpretation, bounded relation detection, and construction of structured
+`NumericPatternMatch` metadata. New families should reuse these pieces, set a
+conservative minimum term count, define direction and relationship parameters, enforce
+integer/work bounds, and explicitly decide whether the family is experimental. Preserve
+the legacy unit-step detector behavior and report alternate valid term boundaries via
+the ambiguity flag.
+
 If a detector requires normalized input, implement the optional
 `NormalizationAwareDetector` contract and reject incompatible engine configuration.
 Bound work and memory in proportion to input and dictionary size, and surface exceeded
 budgets with an explicit content-free error. Preserve valid overlaps and let the engine
 provide final ordering and match-cap enforcement. Add tests for limits, Unicode spans,
 overlap behavior, invalid values, and privacy.
+
+The shared vector format is currently schema version 2. Numeric vectors include each
+term's value and span, the exact relation parameter (or `null`), and ambiguity status.
+Keep expected vectors hand-reviewed and implement the same canonical segmentation,
+family thresholds, limits, and ordering in any parity implementation. Run
+`python benchmarks/benchmark_numeric_sequences.py` to compare the retained legacy
+linear detector with the generalized detector; report the measured setup and results
+without treating local timing as a performance guarantee.
 
 ## Compatibility and contribution
 

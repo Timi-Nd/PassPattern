@@ -1,0 +1,856 @@
+{
+  "schema_version": 2,
+  "numeric_match_fields": ["numeric_terms", "parameter", "ambiguous"],
+  "indexing": "zero-based half-open Unicode code-point offsets into post-normalization processed_text",
+  "vectors": [
+    {
+      "id": "ascii-numeric-sequence",
+      "input": "x123y",
+      "config": {},
+      "detectors": [
+        {
+          "id": "structural.numeric_sequence",
+          "options": {}
+        }
+      ],
+      "expected": {
+        "matches": [
+          {
+            "detector_id": "structural.numeric_sequence",
+            "category": "structural",
+            "pattern_type": "numeric_sequence",
+            "span": [1, 4],
+            "evidence": {
+              "length": 3,
+              "direction": 1
+            },
+            "numeric_terms": [
+              {"value": 1, "span": [1, 2]},
+              {"value": 2, "span": [2, 3]},
+              {"value": 3, "span": [3, 4]}
+            ],
+            "parameter": [1, 1],
+            "ambiguous": false
+          }
+        ]
+      }
+    },
+    {
+      "id": "consecutive-digit-sequence",
+      "input": "1234",
+      "config": {},
+      "detectors": [{"id": "structural.numeric_sequence", "options": {}}],
+      "expected": {
+        "matches": [
+          {
+            "detector_id": "structural.numeric_sequence",
+            "category": "structural",
+            "pattern_type": "numeric_sequence",
+            "span": [0, 4],
+            "evidence": {"length": 4, "direction": 1},
+            "numeric_terms": [
+              {"value": 1, "span": [0, 1]},
+              {"value": 2, "span": [1, 2]},
+              {"value": 3, "span": [2, 3]},
+              {"value": 4, "span": [3, 4]}
+            ],
+            "parameter": [1, 1],
+            "ambiguous": false
+          }
+        ]
+      }
+    },
+    {
+      "id": "ascending-arithmetic-progression",
+      "input": "2468",
+      "config": {},
+      "detectors": [
+        {
+          "id": "structural.numeric_sequence",
+          "options": {}
+        }
+      ],
+      "expected": {
+        "matches": [
+          {
+            "detector_id": "structural.numeric_sequence",
+            "category": "structural",
+            "pattern_type": "arithmetic_progression",
+            "span": [0, 4],
+            "evidence": {"length": 4, "direction": 1},
+            "numeric_terms": [
+              {"value": 2, "span": [0, 1]},
+              {"value": 4, "span": [1, 2]},
+              {"value": 6, "span": [2, 3]},
+              {"value": 8, "span": [3, 4]}
+            ],
+            "parameter": [2, 1],
+            "ambiguous": false
+          }
+        ]
+      }
+    },
+    {
+      "id": "descending-arithmetic-progression",
+      "input": "97531",
+      "config": {},
+      "detectors": [
+        {
+          "id": "structural.numeric_sequence",
+          "options": {}
+        }
+      ],
+      "expected": {
+        "matches": [
+          {
+            "detector_id": "structural.numeric_sequence",
+            "category": "structural",
+            "pattern_type": "arithmetic_progression",
+            "span": [0, 5],
+            "evidence": {"length": 5, "direction": -1},
+            "numeric_terms": [
+              {"value": 9, "span": [0, 1]},
+              {"value": 7, "span": [1, 2]},
+              {"value": 5, "span": [2, 3]},
+              {"value": 3, "span": [3, 4]},
+              {"value": 1, "span": [4, 5]}
+            ],
+            "parameter": [-2, 1],
+            "ambiguous": false
+          }
+        ]
+      }
+    },
+    {
+      "id": "odd-step-arithmetic-progression",
+      "input": "13579",
+      "config": {},
+      "detectors": [{"id": "structural.numeric_sequence", "options": {}}],
+      "expected": {
+        "matches": [
+          {
+            "detector_id": "structural.numeric_sequence",
+            "category": "structural",
+            "pattern_type": "arithmetic_progression",
+            "span": [0, 5],
+            "evidence": {"length": 5, "direction": 1},
+            "numeric_terms": [
+              {"value": 1, "span": [0, 1]},
+              {"value": 3, "span": [1, 2]},
+              {"value": 5, "span": [2, 3]},
+              {"value": 7, "span": [3, 4]},
+              {"value": 9, "span": [4, 5]}
+            ],
+            "parameter": [2, 1],
+            "ambiguous": false
+          }
+        ]
+      }
+    },
+    {
+      "id": "descending-step-arithmetic-progression",
+      "input": "8642",
+      "config": {},
+      "detectors": [{"id": "structural.numeric_sequence", "options": {}}],
+      "expected": {
+        "matches": [
+          {
+            "detector_id": "structural.numeric_sequence",
+            "category": "structural",
+            "pattern_type": "arithmetic_progression",
+            "span": [0, 4],
+            "evidence": {"length": 4, "direction": -1},
+            "numeric_terms": [
+              {"value": 8, "span": [0, 1]},
+              {"value": 6, "span": [1, 2]},
+              {"value": 4, "span": [2, 3]},
+              {"value": 2, "span": [3, 4]}
+            ],
+            "parameter": [-2, 1],
+            "ambiguous": false
+          }
+        ]
+      }
+    },
+    {
+      "id": "multi-digit-arithmetic-progression",
+      "input": "10121416",
+      "config": {},
+      "detectors": [
+        {
+          "id": "structural.numeric_sequence",
+          "options": {}
+        }
+      ],
+      "expected": {
+        "matches": [
+          {
+            "detector_id": "structural.numeric_sequence",
+            "category": "structural",
+            "pattern_type": "arithmetic_progression",
+            "span": [0, 8],
+            "evidence": {"length": 8, "direction": 1},
+            "numeric_terms": [
+              {"value": 10, "span": [0, 2]},
+              {"value": 12, "span": [2, 4]},
+              {"value": 14, "span": [4, 6]},
+              {"value": 16, "span": [6, 8]}
+            ],
+            "parameter": [2, 1],
+            "ambiguous": false
+          },
+          {
+            "detector_id": "structural.numeric_sequence",
+            "category": "structural",
+            "pattern_type": "numeric_sequence",
+            "span": [1, 4],
+            "evidence": {"length": 3, "direction": 1},
+            "numeric_terms": [
+              {"value": 0, "span": [1, 2]},
+              {"value": 1, "span": [2, 3]},
+              {"value": 2, "span": [3, 4]}
+            ],
+            "parameter": [1, 1],
+            "ambiguous": false
+          }
+        ]
+      }
+    },
+    {
+      "id": "multi-digit-step-ten-progression",
+      "input": "20304050",
+      "config": {},
+      "detectors": [{"id": "structural.numeric_sequence", "options": {}}],
+      "expected": {
+        "matches": [
+          {
+            "detector_id": "structural.numeric_sequence",
+            "category": "structural",
+            "pattern_type": "arithmetic_progression",
+            "span": [0, 8],
+            "evidence": {"length": 8, "direction": 1},
+            "numeric_terms": [
+              {"value": 20, "span": [0, 2]},
+              {"value": 30, "span": [2, 4]},
+              {"value": 40, "span": [4, 6]},
+              {"value": 50, "span": [6, 8]}
+            ],
+            "parameter": [10, 1],
+            "ambiguous": false
+          }
+        ]
+      }
+    },
+    {
+      "id": "consecutive-prime-sequence",
+      "input": "235711",
+      "config": {},
+      "detectors": [
+        {
+          "id": "structural.numeric_sequence",
+          "options": {}
+        }
+      ],
+      "expected": {
+        "matches": [
+          {
+            "detector_id": "structural.numeric_sequence",
+            "category": "structural",
+            "pattern_type": "consecutive_prime_sequence",
+            "span": [0, 6],
+            "evidence": {"length": 6, "direction": 1},
+            "numeric_terms": [
+              {"value": 2, "span": [0, 1]},
+              {"value": 3, "span": [1, 2]},
+              {"value": 5, "span": [2, 3]},
+              {"value": 7, "span": [3, 4]},
+              {"value": 11, "span": [4, 6]}
+            ],
+            "parameter": null,
+            "ambiguous": false
+          }
+        ]
+      }
+    },
+    {
+      "id": "multi-digit-consecutive-primes",
+      "input": "11131719",
+      "config": {},
+      "detectors": [{"id": "structural.numeric_sequence", "options": {}}],
+      "expected": {
+        "matches": [
+          {
+            "detector_id": "structural.numeric_sequence",
+            "category": "structural",
+            "pattern_type": "consecutive_prime_sequence",
+            "span": [0, 8],
+            "evidence": {"length": 8, "direction": 1},
+            "numeric_terms": [
+              {"value": 11, "span": [0, 2]},
+              {"value": 13, "span": [2, 4]},
+              {"value": 17, "span": [4, 6]},
+              {"value": 19, "span": [6, 8]}
+            ],
+            "parameter": null,
+            "ambiguous": false
+          }
+        ]
+      }
+    },
+    {
+      "id": "experimental-geometric-progression",
+      "input": "24816",
+      "config": {},
+      "detectors": [
+        {
+          "id": "structural.numeric_sequence",
+          "options": {"experimental_families": ["geometric_progression"]}
+        }
+      ],
+      "expected": {
+        "matches": [
+          {
+            "detector_id": "structural.numeric_sequence",
+            "category": "structural",
+            "pattern_type": "geometric_progression",
+            "span": [0, 5],
+            "evidence": {"length": 5, "direction": 1},
+            "numeric_terms": [
+              {"value": 2, "span": [0, 1]},
+              {"value": 4, "span": [1, 2]},
+              {"value": 8, "span": [2, 3]},
+              {"value": 16, "span": [3, 5]}
+            ],
+            "parameter": [2, 1],
+            "ambiguous": false
+          }
+        ]
+      }
+    },
+    {
+      "id": "experimental-fibonacci-like-progression",
+      "input": "11235813",
+      "config": {},
+      "detectors": [
+        {
+          "id": "structural.numeric_sequence",
+          "options": {"experimental_families": ["fibonacci_like_progression"]}
+        }
+      ],
+      "expected": {
+        "matches": [
+          {
+            "detector_id": "structural.numeric_sequence",
+            "category": "structural",
+            "pattern_type": "fibonacci_like_progression",
+            "span": [0, 8],
+            "evidence": {"length": 8, "direction": 1},
+            "numeric_terms": [
+              {"value": 1, "span": [0, 1]},
+              {"value": 1, "span": [1, 2]},
+              {"value": 2, "span": [2, 3]},
+              {"value": 3, "span": [3, 4]},
+              {"value": 5, "span": [4, 5]},
+              {"value": 8, "span": [5, 6]},
+              {"value": 13, "span": [6, 8]}
+            ],
+            "parameter": null,
+            "ambiguous": false
+          },
+          {
+            "detector_id": "structural.numeric_sequence",
+            "category": "structural",
+            "pattern_type": "numeric_sequence",
+            "span": [1, 4],
+            "evidence": {"length": 3, "direction": 1},
+            "numeric_terms": [
+              {"value": 1, "span": [1, 2]},
+              {"value": 2, "span": [2, 3]},
+              {"value": 3, "span": [3, 4]}
+            ],
+            "parameter": [1, 1],
+            "ambiguous": false
+          }
+        ]
+      }
+    },
+    {
+      "id": "leading-zero-single-digit-term",
+      "input": "01020304",
+      "config": {},
+      "detectors": [{"id": "structural.numeric_sequence", "options": {}}],
+      "expected": {
+        "matches": [
+          {
+            "detector_id": "structural.numeric_sequence",
+            "category": "structural",
+            "pattern_type": "arithmetic_progression",
+            "span": [0, 7],
+            "evidence": {"length": 7, "direction": 1},
+            "numeric_terms": [
+              {"value": 0, "span": [0, 1]},
+              {"value": 10, "span": [1, 3]},
+              {"value": 20, "span": [3, 5]},
+              {"value": 30, "span": [5, 7]}
+            ],
+            "parameter": [10, 1],
+            "ambiguous": false
+          }
+        ]
+      }
+    },
+    {
+      "id": "ambiguous-numeric-segmentation",
+      "input": "12345678",
+      "config": {},
+      "detectors": [{"id": "structural.numeric_sequence", "options": {}}],
+      "expected": {
+        "matches": [
+          {
+            "detector_id": "structural.numeric_sequence",
+            "category": "structural",
+            "pattern_type": "arithmetic_progression",
+            "span": [0, 7],
+            "evidence": {"length": 7, "direction": 1},
+            "numeric_terms": [
+              {"value": 1, "span": [0, 1]},
+              {"value": 23, "span": [1, 3]},
+              {"value": 45, "span": [3, 5]},
+              {"value": 67, "span": [5, 7]}
+            ],
+            "parameter": [22, 1],
+            "ambiguous": false
+          },
+          {
+            "detector_id": "structural.numeric_sequence",
+            "category": "structural",
+            "pattern_type": "arithmetic_progression",
+            "span": [0, 8],
+            "evidence": {"length": 8, "direction": 1},
+            "numeric_terms": [
+              {"value": 12, "span": [0, 2]},
+              {"value": 34, "span": [2, 4]},
+              {"value": 56, "span": [4, 6]},
+              {"value": 78, "span": [6, 8]}
+            ],
+            "parameter": [22, 1],
+            "ambiguous": true
+          },
+          {
+            "detector_id": "structural.numeric_sequence",
+            "category": "structural",
+            "pattern_type": "numeric_sequence",
+            "span": [0, 8],
+            "evidence": {"length": 8, "direction": 1},
+            "numeric_terms": [
+              {"value": 1, "span": [0, 1]},
+              {"value": 2, "span": [1, 2]},
+              {"value": 3, "span": [2, 3]},
+              {"value": 4, "span": [3, 4]},
+              {"value": 5, "span": [4, 5]},
+              {"value": 6, "span": [5, 6]},
+              {"value": 7, "span": [6, 7]},
+              {"value": 8, "span": [7, 8]}
+            ],
+            "parameter": [1, 1],
+            "ambiguous": true
+          }
+        ]
+      }
+    },
+    {
+      "id": "embedded-unicode-numeric-progression",
+      "input": "\ud83d\udd12x2468y",
+      "config": {},
+      "detectors": [{"id": "structural.numeric_sequence", "options": {}}],
+      "expected": {
+        "matches": [
+          {
+            "detector_id": "structural.numeric_sequence",
+            "category": "structural",
+            "pattern_type": "arithmetic_progression",
+            "span": [2, 6],
+            "evidence": {"length": 4, "direction": 1},
+            "numeric_terms": [
+              {"value": 2, "span": [2, 3]},
+              {"value": 4, "span": [3, 4]},
+              {"value": 6, "span": [4, 5]},
+              {"value": 8, "span": [5, 6]}
+            ],
+            "parameter": [2, 1],
+            "ambiguous": false
+          }
+        ]
+      }
+    },
+    {
+      "id": "numeric-coincidence-no-match",
+      "input": "102030",
+      "config": {},
+      "detectors": [{"id": "structural.numeric_sequence", "options": {}}],
+      "expected": {"matches": []}
+    },
+    {
+      "id": "numeric-run-limit-error",
+      "input": "1234",
+      "config": {},
+      "detectors": [
+        {
+          "id": "structural.numeric_sequence",
+          "options": {"max_digit_run": 3}
+        }
+      ],
+      "expected": {"error": "numeric_sequence_limit"}
+    },
+    {
+      "id": "unicode-repeated-scalar",
+      "input": "\ud83d\ude42\ud83d\ude42\ud83d\ude42x",
+      "config": {},
+      "detectors": [
+        {
+          "id": "structural.repeated_character",
+          "options": {}
+        }
+      ],
+      "expected": {
+        "matches": [
+          {
+            "detector_id": "structural.repeated_character",
+            "category": "structural",
+            "pattern_type": "repeated_character",
+            "span": [0, 3],
+            "evidence": {
+              "count": 3
+            }
+          }
+        ]
+      }
+    },
+    {
+      "id": "nfc-processed-codepoint-span",
+      "input": "e\u0301e\u0301e\u0301",
+      "config": {
+        "normalization": "nfc"
+      },
+      "detectors": [
+        {
+          "id": "structural.repeated_character",
+          "options": {}
+        }
+      ],
+      "expected": {
+        "matches": [
+          {
+            "detector_id": "structural.repeated_character",
+            "category": "structural",
+            "pattern_type": "repeated_character",
+            "span": [0, 3],
+            "evidence": {
+              "count": 3
+            }
+          }
+        ]
+      }
+    },
+    {
+      "id": "overlapping-repeated-substrings",
+      "input": "abababa",
+      "config": {},
+      "detectors": [
+        {
+          "id": "structural.repeated_substring",
+          "options": {}
+        }
+      ],
+      "expected": {
+        "matches": [
+          {
+            "detector_id": "structural.repeated_substring",
+            "category": "structural",
+            "pattern_type": "repeated_substring",
+            "span": [0, 6],
+            "evidence": {
+              "count": 3,
+              "length": 2
+            }
+          },
+          {
+            "detector_id": "structural.repeated_substring",
+            "category": "structural",
+            "pattern_type": "repeated_substring",
+            "span": [1, 7],
+            "evidence": {
+              "count": 3,
+              "length": 2
+            }
+          },
+          {
+            "detector_id": "structural.repeated_substring",
+            "category": "structural",
+            "pattern_type": "repeated_substring",
+            "span": [2, 6],
+            "evidence": {
+              "count": 2,
+              "length": 2
+            }
+          },
+          {
+            "detector_id": "structural.repeated_substring",
+            "category": "structural",
+            "pattern_type": "repeated_substring",
+            "span": [3, 7],
+            "evidence": {
+              "count": 2,
+              "length": 2
+            }
+          }
+        ]
+      }
+    },
+    {
+      "id": "date-and-year-overlap",
+      "input": "2024-02-29",
+      "config": {},
+      "detectors": [
+        {
+          "id": "contextual.calendar_date",
+          "options": {}
+        },
+        {
+          "id": "contextual.year",
+          "options": {}
+        }
+      ],
+      "expected": {
+        "matches": [
+          {
+            "detector_id": "contextual.year",
+            "category": "contextual",
+            "pattern_type": "four_digit_year",
+            "span": [0, 4],
+            "evidence": {
+              "length": 4
+            }
+          },
+          {
+            "detector_id": "contextual.calendar_date",
+            "category": "contextual",
+            "pattern_type": "calendar_date",
+            "span": [0, 10],
+            "evidence": {
+              "length": 10,
+              "separator_count": 2,
+              "ambiguous": false,
+              "date_order": 1
+            }
+          }
+        ]
+      }
+    },
+    {
+      "id": "invalid-leap-day-boundary",
+      "input": "2023-02-29",
+      "config": {},
+      "detectors": [
+        {
+          "id": "contextual.calendar_date",
+          "options": {}
+        },
+        {
+          "id": "contextual.year",
+          "options": {}
+        }
+      ],
+      "expected": {
+        "matches": [
+          {
+            "detector_id": "contextual.year",
+            "category": "contextual",
+            "pattern_type": "four_digit_year",
+            "span": [0, 4],
+            "evidence": {
+              "length": 4
+            }
+          }
+        ]
+      }
+    },
+    {
+      "id": "dictionary-word-metadata",
+      "input": "xxcafe!",
+      "config": {},
+      "detectors": [
+        {
+          "id": "dictionary.word",
+          "options": {
+            "entries": [
+              {
+                "word": "cafe",
+                "rank": 17
+              }
+            ]
+          }
+        }
+      ],
+      "expected": {
+        "matches": [
+          {
+            "detector_id": "dictionary.word",
+            "category": "dictionary",
+            "pattern_type": "dictionary_word",
+            "span": [2, 6],
+            "evidence": {
+              "length": 4,
+              "rank": 17,
+              "case_exact": true
+            }
+          }
+        ]
+      }
+    },
+    {
+      "id": "dictionary-compound-suffix",
+      "input": "sunshine2026!",
+      "config": {},
+      "detectors": [
+        {
+          "id": "dictionary.compound",
+          "options": {
+            "entries": [
+              {
+                "word": "sunshine",
+                "rank": 17
+              }
+            ]
+          }
+        }
+      ],
+      "expected": {
+        "matches": [
+          {
+            "detector_id": "dictionary.compound",
+            "category": "dictionary",
+            "pattern_type": "dictionary_compound",
+            "span": [0, 13],
+            "evidence": {
+              "length": 13,
+              "rank": 17,
+              "case_exact": true,
+              "count": 5
+            }
+          }
+        ]
+      }
+    },
+    {
+      "id": "dictionary-compound-rejects-word-continuation",
+      "input": "sunshine2026x",
+      "config": {},
+      "detectors": [
+        {
+          "id": "dictionary.compound",
+          "options": {
+            "entries": [
+              {
+                "word": "sunshine",
+                "rank": 17
+              }
+            ]
+          }
+        }
+      ],
+      "expected": {
+        "matches": []
+      }
+    },
+    {
+      "id": "keyboard-walk-minimum-length",
+      "input": "qwer",
+      "config": {},
+      "detectors": [
+        {
+          "id": "contextual.keyboard_walk",
+          "options": {}
+        }
+      ],
+      "expected": {
+        "matches": [
+          {
+            "detector_id": "contextual.keyboard_walk",
+            "category": "contextual",
+            "pattern_type": "keyboard_walk",
+            "span": [0, 4],
+            "evidence": {
+              "length": 4,
+              "count": 0
+            }
+          }
+        ]
+      }
+    },
+    {
+      "id": "keyboard-walk-custom-layout",
+      "input": "abcd",
+      "config": {},
+      "detectors": [
+        {
+          "id": "contextual.keyboard_walk",
+          "options": {
+            "layout": {
+              "name": "custom",
+              "positions": {
+                "a": [0, 0],
+                "b": [4, 0],
+                "c": [8, 0],
+                "d": [12, 0]
+              }
+            }
+          }
+        }
+      ],
+      "expected": {
+        "matches": [
+          {
+            "detector_id": "contextual.keyboard_walk",
+            "category": "contextual",
+            "pattern_type": "keyboard_walk",
+            "span": [0, 4],
+            "evidence": {
+              "length": 4,
+              "count": 0
+            }
+          }
+        ]
+      }
+    },
+    {
+      "id": "invalid-password-type",
+      "input": 42,
+      "config": {},
+      "detectors": [],
+      "expected": {
+        "error": "invalid_password_type"
+      }
+    },
+    {
+      "id": "invalid-unicode-surrogate",
+      "input": "\ud800",
+      "config": {},
+      "detectors": [],
+      "expected": {
+        "error": "invalid_unicode"
+      }
+    },
+    {
+      "id": "codepoint-limit-boundary",
+      "input": "abcd",
+      "config": {
+        "max_codepoints": 3
+      },
+      "detectors": [],
+      "expected": {
+        "error": "input_too_large"
+      }
+    }
+  ]
+}

@@ -62,7 +62,7 @@ raise `NativeExtensionUnavailableError` at analysis time.
 ## Role as the Rust reference
 
 The Python detectors define expected behavior. Language-neutral vectors in
-[`tests/vectors/passpattern-v1.json`](tests/vectors/passpattern-v1.json) are checked by
+[`tests/vectors/passpattern-v2.json`](tests/vectors/passpattern-v2.json) are checked by
 [`tests/test_shared_vectors.py`](tests/test_shared_vectors.py), and a Rust implementation
 is expected to pass the same file. See [Python/Rust parity](docs/rust-parity.md).
 

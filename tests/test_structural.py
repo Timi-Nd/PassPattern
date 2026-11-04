@@ -5,6 +5,8 @@ import pytest
 from passpattern import (
     EngineConfig,
     EvidenceKey,
+    NumericPatternMatch,
+    NumericSequenceLimitError,
     PassPatternEngine,
     TooManyMatchesError,
 )
@@ -81,6 +83,14 @@ def test_repeated_character_maximal_run_is_one_match() -> None:
         lambda: RepeatedSubstringDetector(min_unit_length=1),
         lambda: RepeatedSubstringDetector(min_repetitions=0),
         lambda: NumericSequenceDetector(min_sequence_length=1),
+        lambda: NumericSequenceDetector(max_digit_run=0),
+        lambda: NumericSequenceDetector(max_digit_run=33),
+        lambda: NumericSequenceDetector(max_term_digits=True),
+        lambda: NumericSequenceDetector(max_term_value=1_000_000),
+        lambda: NumericSequenceDetector(max_terms=17),
+        lambda: NumericSequenceDetector(max_candidates=32_769),
+        lambda: NumericSequenceDetector(max_work=100_001),
+        lambda: NumericSequenceDetector(experimental_families=frozenset({"unknown"})),
         lambda: AlphabeticSequenceDetector(min_sequence_length=-1),
     ],
 )
@@ -178,7 +188,7 @@ def test_empty_and_single_codepoint_inputs_produce_no_structural_matches() -> No
         ("9876", [(0, 4, -1)]),
         ("012345", [(0, 6, 1)]),
         ("654321", [(0, 6, -1)]),
-        ("13579", []),
+        ("13579", [(0, 5, 1)]),
         ("1111", []),
         ("8901", []),
         ("\uff11\uff12\uff13", []),
@@ -205,6 +215,235 @@ def test_numeric_sequences_support_thresholds_multiple_runs_and_overlaps() -> No
         (2, 5),
         (6, 10),
     ]
+
+
+@pytest.mark.parametrize(
+    ("text", "family", "values", "parameter", "direction"),
+    [
+        ("1234", "numeric_sequence", (1, 2, 3, 4), (1, 1), 1),
+        ("2468", "arithmetic_progression", (2, 4, 6, 8), (2, 1), 1),
+        ("13579", "arithmetic_progression", (1, 3, 5, 7, 9), (2, 1), 1),
+        ("8642", "arithmetic_progression", (8, 6, 4, 2), (-2, 1), -1),
+        ("97531", "arithmetic_progression", (9, 7, 5, 3, 1), (-2, 1), -1),
+        ("10121416", "arithmetic_progression", (10, 12, 14, 16), (2, 1), 1),
+        ("20304050", "arithmetic_progression", (20, 30, 40, 50), (10, 1), 1),
+        (
+            "235711",
+            "consecutive_prime_sequence",
+            (2, 3, 5, 7, 11),
+            None,
+            1,
+        ),
+        (
+            "11131719",
+            "consecutive_prime_sequence",
+            (11, 13, 17, 19),
+            None,
+            1,
+        ),
+    ],
+)
+def test_numeric_sequence_families_report_terms_and_relationship(
+    text: str,
+    family: str,
+    values: tuple[int, ...],
+    parameter: tuple[int, int] | None,
+    direction: int,
+) -> None:
+    matches = detect(NumericSequenceDetector(), text)
+    match = next(match for match in matches if match.pattern_type == family)
+
+    assert isinstance(match, NumericPatternMatch)
+    assert tuple(term.value for term in match.terms) == values
+    assert tuple((term.start_index, term.end_index) for term in match.terms) == tuple(
+        (
+            sum(len(str(value)) for value in values[:index]),
+            sum(len(str(value)) for value in values[: index + 1]),
+        )
+        for index in range(len(values))
+    )
+    assert (match.parameter_numerator, match.parameter_denominator) == (
+        parameter if parameter is not None else (None, None)
+    )
+    assert evidence(match, EvidenceKey.DIRECTION) == direction
+    assert not match.ambiguous
+
+
+@pytest.mark.parametrize("text", ["2469", "235", "2359", "23513", "2235", "102030", "9999"])
+def test_numeric_sequences_reject_non_sequences_and_short_prime_runs(text: str) -> None:
+    assert detect(NumericSequenceDetector(), text) == ()
+
+
+def test_numeric_sequences_preserve_legacy_subsequences() -> None:
+    matches = detect(NumericSequenceDetector(), "1235")
+
+    assert [(match.start_index, match.end_index) for match in matches] == [(0, 3)]
+
+
+def test_experimental_numeric_families_are_separately_opt_in() -> None:
+    assert detect(NumericSequenceDetector(), "24816") == ()
+    assert not any(
+        match.pattern_type == "fibonacci_like_progression"
+        for match in detect(NumericSequenceDetector(), "11235813")
+    )
+
+    geometric = NumericSequenceDetector(experimental_families=frozenset({"geometric_progression"}))
+    assert not any(
+        match.pattern_type == "geometric_progression" for match in detect(geometric, "248")
+    )
+    geometric_match = next(
+        match
+        for match in detect(geometric, "24816")
+        if match.pattern_type == "geometric_progression"
+    )
+    assert tuple(term.value for term in geometric_match.terms) == (2, 4, 8, 16)
+    assert (geometric_match.parameter_numerator, geometric_match.parameter_denominator) == (2, 1)
+    descending_geometric = next(
+        match
+        for match in detect(geometric, "16842")
+        if match.pattern_type == "geometric_progression"
+    )
+    assert tuple(term.value for term in descending_geometric.terms) == (16, 8, 4, 2)
+    assert (
+        descending_geometric.parameter_numerator,
+        descending_geometric.parameter_denominator,
+    ) == (1, 2)
+    assert evidence(descending_geometric, EvidenceKey.DIRECTION) == -1
+
+    fibonacci = NumericSequenceDetector(
+        experimental_families=frozenset({"fibonacci_like_progression"})
+    )
+    assert not any(
+        match.pattern_type == "fibonacci_like_progression" for match in detect(fibonacci, "11235")
+    )
+    fibonacci_match = next(
+        match
+        for match in detect(fibonacci, "11235813")
+        if match.pattern_type == "fibonacci_like_progression"
+    )
+    assert tuple(term.value for term in fibonacci_match.terms) == (1, 1, 2, 3, 5, 8, 13)
+
+
+def test_numeric_sequences_define_leading_zero_and_ascii_behavior() -> None:
+    assert detect(NumericSequenceDetector(), "0123")[0].pattern_type == "numeric_sequence"
+    assert detect(NumericSequenceDetector(), "010203") == ()
+    text = "01020304"
+    match = next(
+        match
+        for match in detect(NumericSequenceDetector(), text)
+        if match.pattern_type == "arithmetic_progression"
+    )
+    assert tuple(term.value for term in match.terms) == (0, 10, 20, 30)
+    assert all(text[term.start_index : term.end_index] == str(term.value) for term in match.terms)
+    assert detect(NumericSequenceDetector(), "\u0662\u0664\u0668") == ()
+
+
+def test_numeric_sequences_preserve_embedded_unicode_codepoint_offsets() -> None:
+    text = "\U0001f512x2468y"
+    match = next(
+        match
+        for match in detect(NumericSequenceDetector(), text)
+        if match.pattern_type == "arithmetic_progression"
+    )
+
+    assert (match.start_index, match.end_index) == (2, 6)
+    assert [(term.start_index, term.end_index) for term in match.terms] == [
+        (2, 3),
+        (3, 4),
+        (4, 5),
+        (5, 6),
+    ]
+
+
+def test_numeric_sequence_limits_are_explicit_and_bounded() -> None:
+    NumericSequenceDetector(
+        max_digit_run=32,
+        max_term_digits=6,
+        max_term_value=999_999,
+        max_terms=16,
+        max_candidates=32_768,
+        max_work=100_000,
+    )
+    NumericSequenceDetector(
+        max_digit_run=1,
+        max_term_digits=1,
+        max_term_value=1,
+        max_terms=4,
+        max_candidates=1,
+        max_work=1,
+    )
+    assert detect(NumericSequenceDetector(max_digit_run=4), "2468")
+    with pytest.raises(NumericSequenceLimitError):
+        detect(NumericSequenceDetector(max_digit_run=4), "24680")
+    with pytest.raises(NumericSequenceLimitError):
+        detect(NumericSequenceDetector(max_work=1), "2468")
+    assert detect(NumericSequenceDetector(max_term_value=8), "2468")
+    one_digit_terms = detect(NumericSequenceDetector(max_term_digits=1), "24681012")
+    assert tuple(
+        term.value
+        for match in one_digit_terms
+        if match.pattern_type == "arithmetic_progression"
+        for term in match.terms
+    ) == (2, 4, 6, 8)
+    bounded_terms = detect(NumericSequenceDetector(max_term_value=8), "108642")
+    assert any(
+        match.pattern_type == "arithmetic_progression"
+        and (match.start_index, match.end_index) == (2, 6)
+        for match in bounded_terms
+    )
+    assert not any(
+        match.pattern_type == "arithmetic_progression"
+        for match in detect(NumericSequenceDetector(max_term_value=9), "10121416")
+    )
+    with pytest.raises(NumericSequenceLimitError):
+        detect(NumericSequenceDetector(max_terms=4), "24681012")
+    with pytest.raises(NumericSequenceLimitError):
+        detect(NumericSequenceDetector(max_candidates=1), "2468-13579")
+    assert detect(NumericSequenceDetector(), "1" * 32) == ()
+
+
+def test_engine_propagates_numeric_sequence_limit(monkeypatch) -> None:
+    monkeypatch.setattr(
+        "passpattern.engine.prepare_password",
+        lambda password, config: Prepared(password),
+    )
+    engine = PassPatternEngine((NumericSequenceDetector(max_digit_run=3),))
+
+    with pytest.raises(NumericSequenceLimitError):
+        engine.analyze("1234")
+
+
+def test_numeric_sequence_output_is_deterministic_and_deduplicated() -> None:
+    detector = NumericSequenceDetector()
+    first = detect(detector, "x2468y")
+    second = detect(detector, "x2468y")
+
+    assert first == second
+    assert sum(match.pattern_type == "arithmetic_progression" for match in first) == 1
+
+
+def test_numeric_sequence_segmentation_ambiguity_is_reported() -> None:
+    matches = detect(NumericSequenceDetector(), "12345678")
+    ambiguous_matches = [match for match in matches if match.end_index == 8]
+
+    assert {match.pattern_type for match in ambiguous_matches} == {
+        "arithmetic_progression",
+        "numeric_sequence",
+    }
+    assert all(match.ambiguous for match in ambiguous_matches)
+    assert tuple(
+        term.value
+        for match in ambiguous_matches
+        if match.pattern_type == "arithmetic_progression"
+        for term in match.terms
+    ) == (12, 34, 56, 78)
+
+
+def test_numeric_sequence_preserves_two_term_legacy_threshold() -> None:
+    matches = detect(NumericSequenceDetector(min_sequence_length=2), "12")
+
+    assert len(matches) == 1
+    assert tuple(term.value for term in matches[0].terms) == (1, 2)
 
 
 @pytest.mark.parametrize(

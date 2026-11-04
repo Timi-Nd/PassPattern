@@ -12,6 +12,7 @@ from passpattern.errors import (
     DictionarySearchLimitError,
     InputTooLargeError,
     InvalidDetectorResultError,
+    NumericSequenceLimitError,
     TooManyMatchesError,
 )
 from passpattern.models import AnalysisResult, PatternMatch
@@ -59,7 +60,7 @@ class PassPatternEngine:
         self._detectors = detector_entries
 
     def analyze(self, password: str) -> AnalysisResult:
-        """Prepare and analyze one password without retaining it in the result."""
+        """Analyze a password without retaining its original string in the result."""
         if isinstance(password, str) and len(password) > self._config.max_codepoints:
             raise InputTooLargeError("Password exceeds the configured input-size limit.")
 
@@ -112,7 +113,7 @@ class PassPatternEngine:
         try:
             results = detector.detect(prepared_password)
             iterator = iter(results)
-        except DictionarySearchLimitError:
+        except (DictionarySearchLimitError, NumericSequenceLimitError):
             raise
         except Exception:
             raise DetectorExecutionError("A detector failed.") from None
@@ -122,7 +123,7 @@ class PassPatternEngine:
                 yield next(iterator)
             except StopIteration:
                 return
-            except DictionarySearchLimitError:
+            except (DictionarySearchLimitError, NumericSequenceLimitError):
                 raise
             except Exception:
                 raise DetectorExecutionError("A detector failed.") from None

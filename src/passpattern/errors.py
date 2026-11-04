@@ -39,3 +39,7 @@ class TooManyMatchesError(PassPatternError):
 
 class DictionarySearchLimitError(PassPatternError):
     """A transformation-aware dictionary search exceeded its configured work budget."""
+
+
+class NumericSequenceLimitError(PassPatternError):
+    """Numeric sequence analysis exceeded a configured resource limit."""

@@ -10,11 +10,64 @@ fresh instances. Dictionary detectors require an application-supplied lexicon.
 |---|---|---|---|
 | `RepeatedCharacterDetector` | `structural.repeated_character` / `repeated_character` | `min_repetitions=3`; finds maximal consecutive identical Unicode code points. | Repeated punctuation or intentional text can match. |
 | `RepeatedSubstringDetector` | `structural.repeated_substring` / `repeated_substring` | `min_unit_length=2`, `min_repetitions=2`; emits tandem repeats of primitive units. | Periodic identifiers and deliberate repetition can match. Meaningful overlapping spans are retained. |
-| `NumericSequenceDetector` | `structural.numeric_sequence` / `numeric_sequence` | `min_sequence_length=3`; maximal ASCII digits with constant step +1 or -1. | Does not wrap (9→0), and non-ASCII digits are not considered. |
+| `NumericSequenceDetector` | `structural.numeric_sequence` / `numeric_sequence`, `arithmetic_progression`, `consecutive_prime_sequence` (experimental types: `geometric_progression`, `fibonacci_like_progression`) | `min_sequence_length=3` for maximal ASCII ±1 runs; also recognizes arithmetic progressions and consecutive-prime runs with at least four terms. | Non-ASCII digits are excluded. Numeric-looking substrings can be coincidental; run, term, candidate, and work limits apply. |
 | `AlphabeticSequenceDetector` | `structural.alphabetic_sequence` / `alphabetic_sequence` | `min_sequence_length=3`; maximal ASCII letters with constant case-insensitive step +1 or -1. | Does not wrap (z→a); keyboard adjacency is not used. |
 
-Each threshold accepts integers of at least two; booleans and non-integers are rejected.
+Structural minimum/repetition thresholds reject booleans and values below their
+documented minima.
 `default_structural_detectors()` constructs all four using these defaults.
+
+`NumericSequenceDetector` accepts `min_sequence_length=3` for the compatible
+unit-step detector and these bounded interpretation options:
+
+```python
+NumericSequenceDetector(
+    max_digit_run=32,
+    max_term_digits=6,
+    max_term_value=999_999,
+    max_terms=8,
+    max_candidates=8192,
+    max_work=100_000,
+    experimental_families=frozenset(),
+)
+```
+
+The limits may be lowered within their supported ranges; the maximums are fixed at
+32 ASCII digits per contiguous run, six digits and 999,999 per term, 16 terms, 32,768
+valid candidates, and 100,000 units of interpretation/primality work per detector
+invocation. Exceeding a limit raises the content-free `NumericSequenceLimitError`;
+the detector does not silently truncate. The engine's existing input and total-match
+limits remain in force.
+
+Numeric interpretation first preserves the previous maximal single-digit +1/-1
+matches. Other families use bounded, contiguous terms: a multi-digit term is canonical
+decimal (no leading zero), while `0` is permitted as a single-digit term. Arithmetic
+progressions use exact integer differences; consecutive-prime matches require the
+terms to be adjacent in the prime sequence, not merely prime. Terminations and
+overlaps remain visible, including the legacy run inside a longer numeric string.
+Strings with multiple valid term-boundary interpretations are marked `ambiguous`;
+duplicate matches for the same family, span, and interpretation are coalesced. When
+one family and span have multiple segmentations, the reported terms use the greatest
+term count, then the earliest available boundaries; all distinct interpretations still
+contribute to the ambiguity flag.
+
+Experimental families are off by default. Pass
+`experimental_families=frozenset({"geometric_progression"})` to opt into exact
+integer geometric ratios (at least four positive terms), and/or
+`"fibonacci_like_progression"` to opt into the recurrence
+`t[n] = t[n - 1] + t[n - 2]` (at least six terms). The latter accepts non-negative
+terms with a nondecreasing first pair and rejects the all-zero recurrence; its reported
+direction is ascending. These thresholds reduce accidental matches but do not establish
+that a numeric substring was intentional or predictable to a human.
+
+Numeric matches are `NumericPatternMatch` values, a `PatternMatch` subtype. They carry
+each integer term and its half-open code-point span, direction, a reduced numerator /
+denominator for arithmetic or geometric relationships, and the ambiguity flag. Prime
+matches have no ratio or difference parameter. Term values reproduce numeric content
+from the input, so protect these results like other sensitive password-derived data.
+Future families should reuse the bounded term interpreter, state their recurrence and
+minimum term count, use exact integer arithmetic, and add tests, shared vectors, and
+benchmark cases before being enabled by default.
 
 ## Dictionary
 

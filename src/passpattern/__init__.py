@@ -11,10 +11,18 @@ from passpattern.errors import (
     InvalidPasswordTypeError,
     InvalidUnicodeError,
     NativeExtensionUnavailableError,
+    NumericSequenceLimitError,
     PasswordProcessingError,
     TooManyMatchesError,
 )
-from passpattern.models import AnalysisResult, Evidence, EvidenceKey, PatternMatch
+from passpattern.models import (
+    AnalysisResult,
+    Evidence,
+    EvidenceKey,
+    NumericPatternMatch,
+    NumericTerm,
+    PatternMatch,
+)
 
 __all__ = [
     "AnalysisResult",
@@ -30,6 +38,9 @@ __all__ = [
     "InvalidDetectorResultError",
     "NativeExtensionUnavailableError",
     "NormalizationAwareDetector",
+    "NumericPatternMatch",
+    "NumericSequenceLimitError",
+    "NumericTerm",
     "PassPatternEngine",
     "PasswordProcessingError",
     "PatternMatch",

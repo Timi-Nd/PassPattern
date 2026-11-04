@@ -16,7 +16,7 @@ The current Python implementation provides the behavior to specify:
 | Detector contract and output | `passpattern/detector.py`, `passpattern/models.py` | Detector trait and result types preserving category, type, evidence, and half-open spans. |
 | Coordination and errors | `passpattern/engine.py`, `passpattern/errors.py` | Prepare once, invoke selected detectors, validate outputs, preserve documented errors, and deterministically order results. |
 | Recognition algorithms | `passpattern/structural/`, `passpattern/dictionary/`, `passpattern/contextual/` | Implement detectors in small parity-approved increments, preserving each documented rule and metadata. |
-| Correctness fixtures | `tests/vectors/passpattern-v1.json` | Consume the same JSON fixture and compare every field defined by its schema. |
+| Correctness fixtures | `tests/vectors/passpattern-v2.json` | Consume the same JSON fixture and compare every field defined by its schema. |
 
 A reasonable initial Rust module layout, once its repository and dependency are
 authorized, is `config`, `text`, `model`, `errors`, `engine`, and `detectors` with
@@ -26,7 +26,7 @@ wheel; it is not the Rust-to-Rust integration API.
 
 ## Shared vector format
 
-The versioned fixture at `tests/vectors/passpattern-v1.json` is language-neutral JSON.
+The versioned fixture at `tests/vectors/passpattern-v2.json` is language-neutral JSON.
 Each vector includes:
 
 - A stable ID, input value, detector IDs and options, and engine configuration.
@@ -34,11 +34,23 @@ Each vector includes:
 - Match detector ID, category, pattern type, `span` as `[start, end]`, and typed
   evidence values.
 
+Schema version 2 additionally serializes numeric match metadata: `numeric_terms` is an
+ordered list of `{value, span}` objects, `parameter` is an exact integer
+`[numerator, denominator]` pair or `null`, and `ambiguous` reports alternate valid
+term boundaries for the same span. Numeric family identifiers, canonical term
+segmentation, defaults, thresholds, and resource limits are specified in
+[detectors](detectors.md#structural). In particular, prime matches must represent
+consecutive primes; they are not satisfied by an arbitrary list of prime values.
+When one family and span has multiple valid segmentations, select the one with the most
+terms, then the earliest boundaries; mark all affected matches for that span as
+ambiguous.
+
 `schema_version` governs format changes. Spans are zero-based, half-open Unicode
 code-point offsets into the processed text after configured normalization; they are
 not UTF-8 byte offsets or grapheme indices. Output list order is significant and must
 match the engine's documented deterministic ordering. Evidence object key order is
-not significant.
+not significant. Rust parity must compare all numeric term values, term spans,
+parameters, and ambiguity status, not just the enclosing match span.
 
 Expected results are specified from the reviewed detector rules in
 [detectors](detectors.md) and hand-checked cases, not generated from the Python
@@ -53,7 +65,10 @@ For each detector, work in this order:
 1. Refine the Python prototype and its documented intended behavior.
 2. Add focused Python tests and reviewed shared vectors.
 3. Implement the specified component in Rust without treating Python output alone as
-   the specification.
+   the specification. Numeric parity must preserve the unit-step compatibility path,
+   canonical bounded segmentation (including the single-digit zero rule), exact
+   integer relationships, opt-in experimental families, and content-free limit
+   errors.
 4. Run the same fixture against both implementations and compare errors, output
    ordering, detector/category/type, spans, and all evidence.
 5. Investigate every discrepancy against the written rule; update the specification

@@ -13,6 +13,8 @@ from passpattern import (
     InputTooLargeError,
     InvalidPasswordTypeError,
     InvalidUnicodeError,
+    NumericPatternMatch,
+    NumericSequenceLimitError,
     PassPatternEngine,
 )
 from passpattern.contextual import (
@@ -36,17 +38,23 @@ from passpattern.structural import (
     RepeatedSubstringDetector,
 )
 
-_FIXTURE_PATH = Path(__file__).parent / "vectors" / "passpattern-v1.json"
+_FIXTURE_PATH = Path(__file__).parent / "vectors" / "passpattern-v2.json"
 _FIXTURES = json.loads(_FIXTURE_PATH.read_text(encoding="utf-8"))
 _EXPECTED_ERRORS = {
     "input_too_large": InputTooLargeError,
     "invalid_password_type": InvalidPasswordTypeError,
     "invalid_unicode": InvalidUnicodeError,
+    "numeric_sequence_limit": NumericSequenceLimitError,
 }
 
 
 def test_shared_vector_document_schema() -> None:
-    assert _FIXTURES["schema_version"] == 1
+    assert _FIXTURES["schema_version"] == 2
+    assert _FIXTURES["numeric_match_fields"] == [
+        "numeric_terms",
+        "parameter",
+        "ambiguous",
+    ]
     assert _FIXTURES["indexing"] == (
         "zero-based half-open Unicode code-point offsets into post-normalization processed_text"
     )
@@ -72,16 +80,27 @@ def test_shared_vector_matches_python_reference(vector: dict[str, Any]) -> None:
         return
 
     result = engine.analyze(vector["input"])
-    actual_matches = [
-        {
+    actual_matches: list[dict[str, Any]] = []
+    for match in result.matches:
+        serialized_match: dict[str, Any] = {
             "detector_id": match.detector_id,
             "category": match.category,
             "pattern_type": match.pattern_type,
             "span": [match.start_index, match.end_index],
             "evidence": {item.key.value: item.value for item in match.evidence},
         }
-        for match in result.matches
-    ]
+        if isinstance(match, NumericPatternMatch):
+            serialized_match["numeric_terms"] = [
+                {"value": term.value, "span": [term.start_index, term.end_index]}
+                for term in match.terms
+            ]
+            serialized_match["parameter"] = (
+                [match.parameter_numerator, match.parameter_denominator]
+                if match.parameter_numerator is not None
+                else None
+            )
+            serialized_match["ambiguous"] = match.ambiguous
+        actual_matches.append(serialized_match)
     assert actual_matches == vector["expected"]["matches"]
 
 

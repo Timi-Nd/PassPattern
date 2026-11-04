@@ -2,7 +2,14 @@ from dataclasses import FrozenInstanceError
 
 import pytest
 
-from passpattern import EngineConfig, Evidence, EvidenceKey, PatternMatch
+from passpattern import (
+    EngineConfig,
+    Evidence,
+    EvidenceKey,
+    NumericPatternMatch,
+    NumericTerm,
+    PatternMatch,
+)
 
 
 def test_pattern_match_is_immutable_and_accepts_typed_evidence() -> None:
@@ -42,6 +49,54 @@ def test_pattern_match_rejects_duplicate_evidence_keys() -> None:
             0,
             1,
             (Evidence(EvidenceKey.COUNT, 2), Evidence(EvidenceKey.COUNT, 3)),
+        )
+
+
+def test_numeric_pattern_match_validates_and_preserves_term_metadata() -> None:
+    match = NumericPatternMatch(
+        "structural.numeric_sequence",
+        "structural",
+        "arithmetic_progression",
+        0,
+        4,
+        terms=(
+            NumericTerm(2, 0, 1),
+            NumericTerm(4, 1, 2),
+            NumericTerm(6, 2, 3),
+            NumericTerm(8, 3, 4),
+        ),
+        parameter_numerator=2,
+        parameter_denominator=1,
+    )
+
+    assert tuple(term.value for term in match.terms) == (2, 4, 6, 8)
+    assert not match.ambiguous
+    with pytest.raises(ValueError, match="contiguous"):
+        NumericPatternMatch(
+            "structural.numeric_sequence",
+            "structural",
+            "arithmetic_progression",
+            0,
+            4,
+            terms=(NumericTerm(2, 0, 1), NumericTerm(4, 2, 3), NumericTerm(6, 3, 4)),
+            parameter_numerator=2,
+            parameter_denominator=1,
+        )
+    with pytest.raises(ValueError, match="positive denominator"):
+        NumericPatternMatch(
+            "structural.numeric_sequence",
+            "structural",
+            "arithmetic_progression",
+            0,
+            4,
+            terms=(
+                NumericTerm(2, 0, 1),
+                NumericTerm(4, 1, 2),
+                NumericTerm(6, 2, 3),
+                NumericTerm(8, 3, 4),
+            ),
+            parameter_numerator=2,
+            parameter_denominator=0,
         )
 
 
