@@ -15,8 +15,14 @@ from passpattern import (
     InvalidUnicodeError,
     PassPatternEngine,
 )
-from passpattern.contextual import CalendarDateDetector, KeyboardWalkDetector, YearDetector
+from passpattern.contextual import (
+    CalendarDateDetector,
+    KeyboardLayout,
+    KeyboardWalkDetector,
+    YearDetector,
+)
 from passpattern.dictionary import (
+    DictionaryCompoundDetector,
     DictionaryEntry,
     DictionaryLexicon,
     DictionaryWordDetector,
@@ -93,10 +99,21 @@ def _build_detector(spec: dict[str, Any], normalization: str) -> object:
     if detector_id == "contextual.calendar_date":
         return CalendarDateDetector(**options)
     if detector_id == "contextual.keyboard_walk":
+        layout = options.get("layout")
+        if isinstance(layout, dict):
+            options["layout"] = KeyboardLayout(
+                name=layout["name"],
+                positions={key: tuple(position) for key, position in layout["positions"].items()},
+            )
         return KeyboardWalkDetector(**options)
     if detector_id == "contextual.year":
         return YearDetector(**options)
-    if detector_id in ("dictionary.word", "dictionary.reversed_word", "dictionary.leetspeak"):
+    if detector_id in (
+        "dictionary.word",
+        "dictionary.compound",
+        "dictionary.reversed_word",
+        "dictionary.leetspeak",
+    ):
         entries = [DictionaryEntry(**entry) for entry in options.pop("entries")]
         lexicon_options = options.pop("lexicon", {})
         lexicon = DictionaryLexicon(
@@ -106,6 +123,8 @@ def _build_detector(spec: dict[str, Any], normalization: str) -> object:
         )
         if detector_id == "dictionary.word":
             return DictionaryWordDetector(lexicon, **options)
+        if detector_id == "dictionary.compound":
+            return DictionaryCompoundDetector(lexicon, **options)
         if detector_id == "dictionary.reversed_word":
             return ReversedWordDetector(lexicon, **options)
         return LeetspeakDetector(lexicon, **options)

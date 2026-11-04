@@ -11,10 +11,11 @@ calculator, or guessability model, and it is not published as a package.
 
 - **Structural:** repeated characters, repeated substrings, ascending/descending ASCII
   digit and letter sequences.
-- **Dictionary:** exact and case-insensitive words, reversed words, and bounded
-  leetspeak substitutions, using a ranked lexicon you supply.
-- **Contextual:** Gregorian calendar dates, four-digit years, and walks on a simplified
-  US QWERTY layout.
+- **Dictionary:** exact and case-insensitive words, words with bounded digit/symbol
+  suffixes, reversed words, and bounded leetspeak substitutions, using a ranked lexicon
+  you supply.
+- **Contextual:** Gregorian calendar dates, four-digit years, and keyboard walks using
+  the built-in US QWERTY or a caller-supplied key layout.
 - A deterministic engine: matches are validated, sorted, immutable, and expressed as
   half-open Unicode code-point offsets into the processed text. Overlaps are kept.
 

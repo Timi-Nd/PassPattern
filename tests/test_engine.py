@@ -101,6 +101,46 @@ def test_engine_rejects_out_of_range_unicode_span(monkeypatch: pytest.MonkeyPatc
         PassPatternEngine((detector,)).analyze("synthetic")
 
 
+def test_engine_rejects_unreadable_prepared_text_before_running_detectors(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    class UnreadablePrepared:
+        @property
+        def processed_text(self) -> str:
+            raise RuntimeError("native detail: synthetic-secret")
+
+    detector = StaticDetector("probe", ())
+    monkeypatch.setattr(
+        "passpattern.engine.prepare_password",
+        lambda password, config: UnreadablePrepared(),
+    )
+
+    with pytest.raises(InvalidDetectorResultError) as error:
+        PassPatternEngine((detector,)).analyze("synthetic-secret")
+
+    assert str(error.value) == "Native prepared-password value has no readable processed_text."
+    assert "synthetic-secret" not in repr(error.value)
+    assert detector.received is None
+
+
+def test_engine_rejects_non_string_prepared_text_before_running_detectors(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    prepared = Prepared(42)  # type: ignore[arg-type]
+    detector = StaticDetector("probe", ())
+    monkeypatch.setattr(
+        "passpattern.engine.prepare_password",
+        lambda password, config: prepared,
+    )
+
+    with pytest.raises(InvalidDetectorResultError) as error:
+        PassPatternEngine((detector,)).analyze("synthetic-secret")
+
+    assert str(error.value) == "Native processed_text must be a string."
+    assert "synthetic-secret" not in repr(error.value)
+    assert detector.received is None
+
+
 def test_engine_limits_input_before_native_processing(monkeypatch: pytest.MonkeyPatch) -> None:
     calls: list[str] = []
     monkeypatch.setattr(

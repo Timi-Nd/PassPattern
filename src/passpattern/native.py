@@ -44,13 +44,28 @@ def prepare_password(password: str, config: EngineConfig) -> PreparedPassword:
         raise NativeExtensionUnavailableError(
             "The installed passtext_native wheel does not expose the required API."
         ) from None
+    if not callable(pass_text_config) or not callable(process_password):
+        raise NativeExtensionUnavailableError(
+            "The installed passtext_native wheel does not expose the required API."
+        )
+    if any(
+        not isinstance(native_error, type) or not issubclass(native_error, Exception)
+        for native_error in (
+            native_invalid_input_type_error,
+            native_invalid_unicode_error,
+            native_processing_limit_error,
+        )
+    ):
+        raise NativeExtensionUnavailableError(
+            "The installed passtext_native wheel does not expose the required API."
+        )
 
-    native_config = pass_text_config(
-        max_codepoints=config.max_codepoints,
-        max_utf8_bytes=config.max_utf8_bytes,
-        normalization=config.normalization,
-    )
     try:
+        native_config = pass_text_config(
+            max_codepoints=config.max_codepoints,
+            max_utf8_bytes=config.max_utf8_bytes,
+            normalization=config.normalization,
+        )
         return cast(PreparedPassword, process_password(password, native_config))
     except native_invalid_input_type_error:
         raise InvalidPasswordTypeError("Password must be a string.") from None

@@ -6,6 +6,7 @@ import pytest
 
 from passpattern import EngineConfig, EvidenceKey, PassPatternEngine, TooManyMatchesError
 from passpattern.dictionary import (
+    DictionaryCompoundDetector,
     DictionaryEntry,
     DictionaryLexicon,
     DictionaryMatcher,
@@ -24,6 +25,21 @@ def build_lexicon(*words: tuple[str, int]) -> DictionaryLexicon:
 
 def detect(lexicon: DictionaryLexicon, text: str, *, min_word_length: int = 3):
     detector = DictionaryWordDetector(lexicon, min_word_length=min_word_length)
+    return tuple(detector.detect(Prepared(text)))
+
+
+def detect_compounds(
+    lexicon: DictionaryLexicon,
+    text: str,
+    *,
+    min_word_length: int = 3,
+    max_suffix_length: int = 16,
+):
+    detector = DictionaryCompoundDetector(
+        lexicon,
+        min_word_length=min_word_length,
+        max_suffix_length=max_suffix_length,
+    )
     return tuple(detector.detect(Prepared(text)))
 
 
@@ -300,6 +316,90 @@ def test_dictionary_evidence_contains_only_safe_metadata() -> None:
         EvidenceKey.CASE_EXACT: True,
     }
     assert "password" not in repr(result)
+
+
+@pytest.mark.parametrize(
+    ("text", "expected_span", "expected_suffix_length"),
+    [
+        ("sunshine2026", (0, 12), 4),
+        ("Sunshine!", (0, 9), 1),
+        ("sunshine-2026!", (0, 14), 6),
+    ],
+)
+def test_dictionary_compound_finds_word_with_bounded_suffix(
+    text: str,
+    expected_span: tuple[int, int],
+    expected_suffix_length: int,
+) -> None:
+    found = detect_compounds(build_lexicon(("sunshine", 7)), text)
+
+    assert len(found) == 1
+    match = found[0]
+    assert (match.start_index, match.end_index) == expected_span
+    assert match.detector_id == "dictionary.compound"
+    assert match.pattern_type == "dictionary_compound"
+    assert metadata(match) == {
+        EvidenceKey.LENGTH: expected_span[1] - expected_span[0],
+        EvidenceKey.RANK: 7,
+        EvidenceKey.CASE_EXACT: False if text[0].isupper() else True,
+        EvidenceKey.COUNT: expected_suffix_length,
+    }
+    assert "sunshine" not in repr(match)
+
+
+@pytest.mark.parametrize(
+    "text",
+    [
+        "megadragon2026",
+        "dragon2026x",
+        "dragon",
+        "dragon 2026",
+        "édragon2026",
+        "dragon2026\u0301",
+    ],
+)
+def test_dictionary_compound_requires_word_boundaries_and_contiguous_suffix(
+    text: str,
+) -> None:
+    assert detect_compounds(build_lexicon(("dragon", 1)), text) == ()
+
+
+def test_dictionary_compound_uses_unicode_codepoint_spans() -> None:
+    text = "\U0001f642caf\u00e92026!"
+    found = detect_compounds(build_lexicon(("caf\u00e9", 2)), text)
+
+    assert [(match.start_index, match.end_index) for match in found] == [(1, 10)]
+
+
+def test_dictionary_compound_enforces_configured_suffix_bound() -> None:
+    lexicon = build_lexicon(("dragon", 1))
+
+    assert len(detect_compounds(lexicon, "dragon1234", max_suffix_length=4)) == 1
+    assert detect_compounds(lexicon, "dragon12345", max_suffix_length=4) == ()
+
+
+@pytest.mark.parametrize(
+    "kwargs",
+    [
+        {"min_word_length": 0},
+        {"min_word_length": True},
+        {"min_word_length": 129},
+        {"max_suffix_length": 0},
+        {"max_suffix_length": True},
+        {"max_suffix_length": 129},
+    ],
+)
+def test_dictionary_compound_rejects_invalid_limits(kwargs: dict[str, object]) -> None:
+    with pytest.raises(ValueError):
+        DictionaryCompoundDetector(build_lexicon(("dragon", 1)), **kwargs)  # type: ignore[arg-type]
+
+
+def test_dictionary_compound_declares_lexicon_normalization_requirement() -> None:
+    detector = DictionaryCompoundDetector(
+        DictionaryLexicon([DictionaryEntry("caf\u00e9", 1)], normalization="nfc")
+    )
+
+    assert detector.required_normalization == "nfc"
 
 
 def test_matcher_is_reusable_for_overlapping_matches() -> None:

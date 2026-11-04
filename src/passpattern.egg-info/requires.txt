@@ -1,0 +1,6 @@
+
+[dev]
+mypy>=1.10
+passtext-native<0.2.0,>=0.1.0
+pytest>=8.0
+ruff>=0.5

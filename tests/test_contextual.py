@@ -298,6 +298,14 @@ def test_keyboard_detector_recognizes_common_physical_paths(text: str) -> None:
     assert all(EvidenceKey.LENGTH in evidence(match) for match in found)
 
 
+def test_keyboard_detector_accepts_custom_layout() -> None:
+    layout = KeyboardLayout("custom", {"a": (0, 0), "b": (4, 0), "c": (8, 0), "d": (12, 0)})
+    detector = KeyboardWalkDetector(layout=layout)
+
+    assert matches(KeyboardWalkDetector(), "abcd") == ()
+    assert [(match.start_index, match.end_index) for match in matches(detector, "abcd")] == [(0, 4)]
+
+
 def test_keyboard_detector_recognizes_turns_and_preserves_overlapping_walks() -> None:
     found = matches(KeyboardWalkDetector(), "qwerfdsa")
 
@@ -349,6 +357,7 @@ def test_keyboard_detector_ignores_non_ascii_and_empty_text() -> None:
         {"max_turns": True},
         {"layout": "dvorak"},
         {"layout": None},
+        {"layout": object()},
     ],
 )
 def test_keyboard_detector_rejects_invalid_configuration(kwargs) -> None:

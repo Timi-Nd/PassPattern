@@ -234,6 +234,61 @@
       }
     },
     {
+      "id": "dictionary-compound-suffix",
+      "input": "sunshine2026!",
+      "config": {},
+      "detectors": [
+        {
+          "id": "dictionary.compound",
+          "options": {
+            "entries": [
+              {
+                "word": "sunshine",
+                "rank": 17
+              }
+            ]
+          }
+        }
+      ],
+      "expected": {
+        "matches": [
+          {
+            "detector_id": "dictionary.compound",
+            "category": "dictionary",
+            "pattern_type": "dictionary_compound",
+            "span": [0, 13],
+            "evidence": {
+              "length": 13,
+              "rank": 17,
+              "case_exact": true,
+              "count": 5
+            }
+          }
+        ]
+      }
+    },
+    {
+      "id": "dictionary-compound-rejects-word-continuation",
+      "input": "sunshine2026x",
+      "config": {},
+      "detectors": [
+        {
+          "id": "dictionary.compound",
+          "options": {
+            "entries": [
+              {
+                "word": "sunshine",
+                "rank": 17
+              }
+            ]
+          }
+        }
+      ],
+      "expected": {
+        "matches": []
+      }
+    },
+    {
       "id": "keyboard-walk-minimum-length",
       "input": "qwer",
       "config": {},
@@ -241,6 +296,41 @@
         {
           "id": "contextual.keyboard_walk",
           "options": {}
+        }
+      ],
+      "expected": {
+        "matches": [
+          {
+            "detector_id": "contextual.keyboard_walk",
+            "category": "contextual",
+            "pattern_type": "keyboard_walk",
+            "span": [0, 4],
+            "evidence": {
+              "length": 4,
+              "count": 0
+            }
+          }
+        ]
+      }
+    },
+    {
+      "id": "keyboard-walk-custom-layout",
+      "input": "abcd",
+      "config": {},
+      "detectors": [
+        {
+          "id": "contextual.keyboard_walk",
+          "options": {
+            "layout": {
+              "name": "custom",
+              "positions": {
+                "a": [0, 0],
+                "b": [4, 0],
+                "c": [8, 0],
+                "d": [12, 0]
+              }
+            }
+          }
         }
       ],
       "expected": {

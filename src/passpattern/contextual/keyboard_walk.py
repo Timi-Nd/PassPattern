@@ -1,22 +1,26 @@
-"""Recognition of bounded physical walks on a US QWERTY keyboard."""
+"""Recognition of bounded physical keyboard walks."""
 
 from __future__ import annotations
 
 from collections.abc import Iterator
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 
-from passpattern.contextual.keyboard_layout import US_QWERTY
+from passpattern.contextual.keyboard_layout import US_QWERTY, KeyboardLayout
 from passpattern.models import Evidence, EvidenceKey, PatternMatch
 from passpattern.native import PreparedPassword
 
 
 @dataclass(frozen=True, slots=True)
 class KeyboardWalkDetector:
-    """Find maximal overlapping key paths with a bounded number of turns."""
+    """Find maximal overlapping key paths with a bounded number of turns.
+
+    The default layout is US QWERTY; callers may supply a custom KeyboardLayout.
+    """
 
     min_walk_length: int = 4
     max_turns: int = 1
-    layout: str = "us_qwerty"
+    layout: KeyboardLayout | str = "us_qwerty"
+    _keyboard_layout: KeyboardLayout = field(init=False, repr=False, compare=False)
 
     def __post_init__(self) -> None:
         if (
@@ -31,8 +35,13 @@ class KeyboardWalkDetector:
             or self.max_turns < 0
         ):
             raise ValueError("max_turns must be a non-negative integer.")
-        if self.layout != "us_qwerty":
-            raise ValueError("Only the 'us_qwerty' keyboard layout is supported.")
+        if self.layout == "us_qwerty":
+            keyboard_layout = US_QWERTY
+        elif isinstance(self.layout, KeyboardLayout):
+            keyboard_layout = self.layout
+        else:
+            raise ValueError("layout must be 'us_qwerty' or a KeyboardLayout instance.")
+        object.__setattr__(self, "_keyboard_layout", keyboard_layout)
 
     @property
     def detector_id(self) -> str:
@@ -61,16 +70,20 @@ class KeyboardWalkDetector:
 
             yield from self._emit_run(run_start, directions)
 
-    @staticmethod
     def _valid_edge(
+        self,
         keys: tuple[str | None, ...],
         index: int,
     ) -> tuple[int, int] | None:
         first = keys[index]
         second = keys[index + 1]
-        if first is None or second is None or not US_QWERTY.are_neighbors(first, second):
+        if (
+            first is None
+            or second is None
+            or not self._keyboard_layout.are_neighbors(first, second)
+        ):
             return None
-        return US_QWERTY.direction(first, second)
+        return self._keyboard_layout.direction(first, second)
 
     def _emit_run(
         self,

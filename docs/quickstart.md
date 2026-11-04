@@ -81,6 +81,26 @@ Dictionary matching accepts case-insensitive ASCII variants; exact case can be
 reported as numeric/boolean evidence. Dictionary normalization must agree with the
 engine configuration.
 
+For a supplied word followed by digits or punctuation, use the separate compound
+detector:
+
+```python
+from passpattern import PassPatternEngine
+from passpattern.dictionary import (
+    DictionaryCompoundDetector,
+    DictionaryEntry,
+    DictionaryLexicon,
+)
+
+lexicon = DictionaryLexicon((DictionaryEntry("example", rank=1),))
+engine = PassPatternEngine((DictionaryCompoundDetector(lexicon),))
+result = engine.analyze("example-2026!")
+```
+
+The compound detector is opt-in and reports the full word-plus-suffix span. It requires
+a word boundary on either side and uses a bounded ASCII suffix; see the
+[detector guide](detectors.md) for its limits.
+
 ## Dictionary transformations
 
 ```python

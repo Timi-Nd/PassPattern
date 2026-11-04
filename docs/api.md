@@ -67,6 +67,10 @@ spans, and pattern metadata can still be sensitive.
 
 ## Dictionary types
 
+- `DictionaryCompoundDetector(lexicon, *, min_word_length=3,
+  max_suffix_length=16)` finds a supplied dictionary word at a Unicode-aware boundary,
+  followed by a bounded run of ASCII digits and/or punctuation. It is opt-in and
+  requires no bundled lexicon.
 - `DictionaryEntry(word: str, rank: int, source_id: str | None = None)` requires a
   nonempty valid Unicode-scalar word and positive integer rank. `source_id`, if given,
   must be a short ASCII identifier.
